@@ -32,9 +32,8 @@
 #include <asm/cpu.h>
 #include <asm/cputype.h>
 #include <asm/exception.h>
-#ifdef CONFIG_ARM_CPU_TOPOLOGY
+#include <asm/idmap.h>
 #include <asm/topology.h>
-#endif
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
