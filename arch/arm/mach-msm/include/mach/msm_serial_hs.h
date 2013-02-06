@@ -28,23 +28,8 @@ struct msm_serial_hs_platform_data {
 #ifdef CONFIG_SERIAL_BCM_BT_LPM
 	void (*exit_lpm_cb)(struct uart_port *);
 #endif
-	unsigned char cpu_lock_supported;
-
-	/* for bcm BT */
-	int rx_wakeup_irq;  /* wakeup irq */
-	unsigned char bt_wakeup_pin_supported;
-	unsigned char bt_wakeup_pin;	/* Device to Chip */
-	unsigned char host_wakeup_pin;	/* Chip to Device */
 };
-#if 1		//Add by evan.xu@2012-02-02
-/* API for TI_ST */
-extern void ti_msm_hs_request_clock_off(struct uart_port *uport);
-extern void ti_msm_hs_request_clock_on(struct uart_port *uport);
-extern void ti_dc_msm_hs_request_clock_off(struct uart_port *uport);
-extern void ti_dc_msm_hs_request_clock_on(struct uart_port *uport);
-#endif
 
-extern void imc_msm_hs_request_clock_on(struct uart_port *uport);
 unsigned int msm_hs_tx_empty(struct uart_port *uport);
 void msm_hs_request_clock_off(struct uart_port *uport);
 void msm_hs_request_clock_on(struct uart_port *uport);

@@ -116,7 +116,7 @@ static void send_cable_connect_notify(int cable_type)
 	CABLE_DEBUG("%s: cable_type = %d\n", __func__, cable_type);
 
 	if (cable_type == CONNECT_TYPE_UNKNOWN)
-		cable_type = CONNECT_TYPE_USB;
+		cable_type = CONNECT_TYPE_AC;
 
 	if (pInfo->ac_9v_gpio && (cable_type == CONNECT_TYPE_USB
 				|| cable_type == CONNECT_TYPE_AC)) {
@@ -145,7 +145,6 @@ static void send_cable_connect_notify(int cable_type)
 				CABLE_INFO("Send to: %s, type %d\n",
 						notifier->name, cable_type);
 				/* Notify other drivers about connect type. */
-				/* use slow charging for unknown type*/
 				notifier->func(cable_type);
 			}
 		}
@@ -505,14 +504,6 @@ static int mhl_detect(struct cable_detect_info *pInfo)
 
 	if (pInfo->config_usb_id_gpios)
 		pInfo->config_usb_id_gpios(1);
-	else {
-#if (defined(CONFIG_USB_OTG) && defined(CONFIG_USB_OTG_HOST))
-		type = DOCK_STATE_USB_HOST;
-#else
-		type = DOCK_STATE_UNDEFINED;
-#endif
-		return type;
-	}
 
 	adc_value = cable_detect_get_adc();
 	CABLE_INFO("[2nd] accessory adc = 0x%x\n", adc_value);
