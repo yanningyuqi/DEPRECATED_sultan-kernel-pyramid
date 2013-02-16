@@ -243,10 +243,6 @@ static void set_cpu_work(struct work_struct *work)
 }
 #endif
 
-#ifdef CONFIG_CPU_FREQ_GOV_INTELLIDEMAND
-extern bool lmf_screen_state;
-#endif
-
 #ifdef CONFIG_CMDLINE_OPTIONS
 static void msm_cpufreq_early_suspend(struct early_suspend *h)
 {
@@ -265,13 +261,6 @@ static void msm_cpufreq_early_suspend(struct early_suspend *h)
 			}
 		}
 
-		/* disable 2nd core as well since screen is off */
-		if (cpu == 0 && num_online_cpus() > 1) {
-#ifdef CONFIG_CPU_FREQ_GOV_INTELLIDEMAND
-			lmf_screen_state = false;
-#endif
-			cpu_down(1);
-		}
 		mutex_unlock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
 	}
 }
@@ -295,13 +284,6 @@ static void msm_cpufreq_late_resume(struct early_suspend *h)
 			}
 		}
 
-		/* re-enable 2nd core */
-		if (num_online_cpus() < 2 && cpu == 0) {
-#ifdef CONFIG_CPU_FREQ_GOV_INTELLIDEMAND
-			lmf_screen_state = true;
-#endif
-			cpu_up(1);
-			}
 		mutex_unlock(&per_cpu(cpufreq_suspend, cpu).suspend_mutex);
 	}
 }
@@ -381,9 +363,6 @@ static int msm_cpufreq_target(struct cpufreq_policy *policy,
 #endif
 
 done:
-#ifdef CONFIG_SMP
-	free_cpumask_var(mask);
-#endif
 	mutex_unlock(&per_cpu(cpufreq_suspend, policy->cpu).suspend_mutex);
 	return ret;
 }
