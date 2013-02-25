@@ -1000,16 +1000,8 @@ static struct resource kgsl_2d0_resources[] = {
 static struct kgsl_device_platform_data kgsl_2d0_pdata = {
 	.pwrlevel = {
 		{
-			.gpu_freq = 320000000,
-			.bus_freq = 4,
-		},
-		{
-			.gpu_freq = 300000000,
-			.bus_freq = 4,
-		},
-		{
 			.gpu_freq = 266667000,
-			.bus_freq = 3,
+			.bus_freq = 2,
 		},
 		{
 			.gpu_freq = 228571000,
@@ -1028,8 +1020,8 @@ static struct kgsl_device_platform_data kgsl_2d0_pdata = {
 			.bus_freq = 1,
 		},
 	},
-	.init_level = 6,
-	.num_levels = 7,
+	.init_level = 4,
+	.num_levels = 5,
 	.set_grp_async = NULL,
 	.idle_timeout = HZ/5,
 	.nap_allowed = false,
@@ -1067,16 +1059,8 @@ static struct resource kgsl_2d1_resources[] = {
 static struct kgsl_device_platform_data kgsl_2d1_pdata = {
 	.pwrlevel = {
 		{
-			.gpu_freq = 320000000,
-			.bus_freq = 4,
-		},
-		{
-			.gpu_freq = 300000000,
-			.bus_freq = 4,
-		},
-		{
 			.gpu_freq = 266667000,
-			.bus_freq = 3,
+			.bus_freq = 2,
 		},
 		{
 			.gpu_freq = 228571000,
@@ -1095,8 +1079,8 @@ static struct kgsl_device_platform_data kgsl_2d1_pdata = {
 			.bus_freq = 1,
 		},
 	},
-	.init_level = 6,
-	.num_levels = 7,
+	.init_level = 4,
+	.num_levels = 5,
 	.set_grp_async = NULL,
 	.idle_timeout = HZ/5,
 	.nap_allowed = false,
