@@ -136,6 +136,11 @@ static long comedi_unlocked_ioctl(struct file *file, unsigned int cmd,
 	/* Device config is special, because it must work on
 	 * an unconfigured device. */
 	if (cmd == COMEDI_DEVCONFIG) {
+		if (minor >= COMEDI_NUM_BOARD_MINORS) {
+			/* Device config not appropriate on non-board minors. */
+			rc = -ENOTTY;
+			goto done;
+		}
 		rc = do_devconfig_ioctl(dev,
 					(struct comedi_devconfig __user *)arg);
 		if (rc == 0)
@@ -1402,15 +1407,6 @@ static int do_poll_ioctl(struct comedi_device *dev, unsigned int arg,
 			 void *file)
 {
 	struct comedi_subdevice *s;
-	struct comedi_device_file_info *dev_file_info;
-	struct comedi_device *dev;
-
-	dev_file_info = comedi_get_device_file_info(minor);
-	if (dev_file_info == NULL)
-	        return -ENODEV;
-	dev = dev_file_info->device;
-	if (dev == NULL)
-	        return -ENODEV;
 
 	if (arg >= dev->n_subdevices)
 		return -EINVAL;
