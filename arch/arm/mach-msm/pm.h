@@ -68,7 +68,6 @@ struct msm_pm_platform_data {
 				staying in the low power mode saves power */
 };
 
-
 void msm_pm_set_platform_data(struct msm_pm_platform_data *data, int count);
 int msm_pm_idle_prepare(struct cpuidle_device *dev);
 int msm_pm_idle_enter(enum msm_pm_sleep_mode sleep_mode);
@@ -80,11 +79,20 @@ void msm_pm_set_rpm_wakeup_irq(unsigned int irq);
 static inline void msm_pm_set_rpm_wakeup_irq(unsigned int irq) {}
 #endif
 
+#ifdef CONFIG_MSM_PM8X60
+int msm_pm_wait_cpu_shutdown(unsigned int cpu);
+bool msm_pm_verify_cpu_pc(unsigned int cpu);
+#else
+static inline int msm_pm_wait_cpu_shutdown(unsigned int cpu) { return 0; }
+static inline bool msm_pm_verify_cpu_pc(unsigned int cpu) { return true; }
+#endif
+
 #ifdef CONFIG_HOTPLUG_CPU
 int msm_platform_secondary_init(unsigned int cpu);
 #else
 static inline int msm_platform_secondary_init(unsigned int cpu) { return 0; }
 #endif
+
 int print_gpio_buffer(struct seq_file *m);
 int free_gpio_buffer(void);
 

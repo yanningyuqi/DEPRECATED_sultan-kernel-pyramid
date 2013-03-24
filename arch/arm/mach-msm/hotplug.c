@@ -1,6 +1,7 @@
 /*
  *  Copyright (C) 2002 ARM Ltd.
  *  All Rights Reserved
+ *  Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -11,11 +12,13 @@
 #include <linux/smp.h>
 
 #include <asm/cacheflush.h>
+#include <asm/smp_plat.h>
 #include <asm/vfp.h>
 
+#include "pm.h"
 #include "qdss.h"
 #include "spm.h"
-#include "pm.h"
+
 
 extern volatile int pen_release;
 
@@ -25,7 +28,7 @@ struct msm_hotplug_device {
 };
 
 static DEFINE_PER_CPU_SHARED_ALIGNED(struct msm_hotplug_device,
-		msm_hotplug_devices);
+			msm_hotplug_devices);
 
 static inline void cpu_enter_lowpower(void)
 {
@@ -38,7 +41,7 @@ static inline void cpu_leave_lowpower(void)
 {
 }
 
-static inline void platform_do_lowpower(unsigned int cpu)
+static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
 {
 	/* Just enter wfi for now. TODO: Properly shut off the cpu. */
 	for (;;) {
@@ -59,7 +62,7 @@ static inline void platform_do_lowpower(unsigned int cpu)
 		 * possible, since we are currently running incoherently, and
 		 * therefore cannot safely call printk() or anything else
 		 */
-		pr_debug("CPU%u: spurious wakeup call\n", cpu);
+		(*spurious)++;
 	}
 }
 
@@ -67,8 +70,13 @@ int platform_cpu_kill(unsigned int cpu)
 {
 	struct completion *killed =
 		&per_cpu(msm_hotplug_devices, cpu).cpu_killed;
+	int ret;
 
-	return wait_for_completion_timeout(killed, HZ * 5);
+	ret = wait_for_completion_timeout(killed, HZ * 5);
+	if (ret)
+		return ret;
+
+	return msm_pm_wait_cpu_shutdown(cpu);
 }
 
 /*
@@ -78,6 +86,8 @@ int platform_cpu_kill(unsigned int cpu)
  */
 void platform_cpu_die(unsigned int cpu)
 {
+	int spurious = 0;
+
 	if (unlikely(cpu != smp_processor_id())) {
 		pr_crit("%s: running on %u, should be %u\n",
 			__func__, smp_processor_id(), cpu);
@@ -88,10 +98,13 @@ void platform_cpu_die(unsigned int cpu)
 	 * we're ready for shutdown now, so do it
 	 */
 	cpu_enter_lowpower();
-	platform_do_lowpower(cpu);
+	platform_do_lowpower(cpu, &spurious);
 
 	pr_notice("CPU%u: %s: normal wakeup\n", cpu, __func__);
 	cpu_leave_lowpower();
+
+	if (spurious)
+		pr_warn("CPU%u: %u spurious wakeup calls\n", cpu, spurious);
 }
 
 int platform_cpu_disable(unsigned int cpu)
@@ -113,8 +126,7 @@ int msm_platform_secondary_init(unsigned int cpu)
 		init_completion(&dev->cpu_killed);
 		return 0;
 	}
-	etm_restore_reg_check();
-	msm_restore_jtag_debug();
+	msm_jtag_restore_state();
 #ifdef CONFIG_VFP
 	vfp_reinit();
 #endif

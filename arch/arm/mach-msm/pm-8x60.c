@@ -51,7 +51,7 @@
 #include "acpuclock.h"
 #include "clock.h"
 #include "avs.h"
-#include "cpuidle.h"
+#include <mach/cpuidle.h>
 #include "idle.h"
 #include "pm.h"
 #include "rpm_resources.h"
@@ -653,7 +653,7 @@ static bool msm_pm_spm_power_collapse(
 	int ret;
 
 	if (MSM_PM_DEBUG_POWER_COLLAPSE & msm_pm_debug_mask)
-		pr_info("CPU%u: %s: notify_rpm %d\n",
+		pr_info("[K] CPU%u: %s: notify_rpm %d\n",
 			cpu, __func__, (int) notify_rpm);
 
 	ret = msm_spm_set_low_power_mode(
@@ -665,7 +665,7 @@ static bool msm_pm_spm_power_collapse(
 	msm_pm_boot_config_before_pc(cpu, virt_to_phys(entry));
 
 	if (MSM_PM_DEBUG_RESET_VECTOR & msm_pm_debug_mask)
-		pr_info("CPU%u: %s: program vector to %p\n",
+		pr_info("[K] CPU%u: %s: program vector to %p\n",
 			cpu, __func__, entry);
 
 #ifdef CONFIG_VFP
@@ -712,7 +712,7 @@ static bool msm_pm_spm_power_collapse(
 	}
 
 	if (MSM_PM_DEBUG_POWER_COLLAPSE & msm_pm_debug_mask)
-		pr_info("CPU%u: %s: msm_pm_collapse returned, collapsed %d\n",
+		pr_info("[K] CPU%u: %s: msm_pm_collapse returned, collapsed %d\n",
 			cpu, __func__, collapsed);
 
 	if (MSM_PM_DEBUG_RPM_TIMESTAMP & msm_pm_debug_mask && !from_idle)
@@ -746,7 +746,7 @@ static bool msm_pm_power_collapse(bool from_idle)
 	int blk_xo_vddmin_count = 0;
 
 	if (MSM_PM_DEBUG_POWER_COLLAPSE & msm_pm_debug_mask)
-		pr_info("CPU%u: %s: idle %d\n",
+		pr_info("[K] CPU%u: %s: idle %d\n",
 			cpu, __func__, (int)from_idle);
 
 	if (smp_processor_id() == 0) {
@@ -777,7 +777,7 @@ static bool msm_pm_power_collapse(bool from_idle)
 
 	msm_pm_config_hw_before_power_down();
 	if (MSM_PM_DEBUG_POWER_COLLAPSE & msm_pm_debug_mask)
-		pr_info("CPU%u: %s: pre power down\n", cpu, __func__);
+		pr_info("[K] CPU%u: %s: pre power down\n", cpu, __func__);
 
 	avsdscr_setting = avs_get_avsdscr();
 	avs_disable();
@@ -788,7 +788,7 @@ static bool msm_pm_power_collapse(bool from_idle)
 		saved_acpuclk_rate = 0;
 
 	if ((!from_idle) && (MSM_PM_DEBUG_CLOCK & msm_pm_debug_mask))
-		pr_info("CPU%u: %s: change clock rate (old rate = %lu)\n",
+		pr_info("[K] CPU%u: %s: change clock rate (old rate = %lu)\n",
 			cpu, __func__, saved_acpuclk_rate);
 
 	collapsed = msm_pm_spm_power_collapse(cpu, from_idle, true);
@@ -797,19 +797,19 @@ static bool msm_pm_power_collapse(bool from_idle)
 			msm_rpm_dump_stat();
 
 	if ((!from_idle) && (MSM_PM_DEBUG_CLOCK & msm_pm_debug_mask))
-		pr_info("CPU%u: %s: restore clock rate to %lu\n",
+		pr_info("[K] CPU%u: %s: restore clock rate to %lu\n",
 			cpu, __func__, saved_acpuclk_rate);
 	if (acpuclk_set_rate(cpu, saved_acpuclk_rate, SETRATE_PC) < 0)
-		pr_err("CPU%u: %s: failed to restore clock rate(%lu)\n",
+		pr_err("[K] CPU%u: %s: failed to restore clock rate(%lu)\n",
 			cpu, __func__, saved_acpuclk_rate);
 
 	avs_reset_delays(avsdscr_setting);
 	msm_pm_config_hw_after_power_up();
 	if (MSM_PM_DEBUG_POWER_COLLAPSE & msm_pm_debug_mask)
-		pr_info("CPU%u: %s: post power up\n", cpu, __func__);
+		pr_info("[K] CPU%u: %s: post power up\n", cpu, __func__);
 
 	if (MSM_PM_DEBUG_POWER_COLLAPSE & msm_pm_debug_mask)
-		pr_info("CPU%u: %s: return\n", cpu, __func__);
+		pr_info("[K] CPU%u: %s: return\n", cpu, __func__);
 	return collapsed;
 }
 
@@ -1059,8 +1059,6 @@ void msm_pm_cpu_enter_lowpower(unsigned int cpu)
 		msm_pm_power_collapse_standalone(false);
 	else if (allow[MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT])
 		msm_pm_swfi();
-
-
 }
 
 static int msm_pm_enter(suspend_state_t state)
