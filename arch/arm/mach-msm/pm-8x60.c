@@ -657,7 +657,7 @@ static void msm_pm_retention(void)
 	WARN_ON(ret);
 }
 
-static bool __ref msm_pm_spm_power_collapse(
+static bool msm_pm_spm_power_collapse(
 	unsigned int cpu, bool from_idle, bool notify_rpm)
 {
 	void *entry;
@@ -893,6 +893,11 @@ int msm_pm_idle_prepare(struct cpuidle_device *dev)
 				allow = false;
 				break;
 			}
+			/* fall through */
+
+		case MSM_PM_SLEEP_MODE_RETENTION:
+			if (!allow)
+				break;
 			/* fall through */
 
 		case MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT:
@@ -1332,7 +1337,7 @@ static void __init boot_lock_nohalt(void)
 	}
 	disable_hlt();
 	schedule_delayed_work(&work_expire_boot_lock, nohalt_timeout);
-	pr_info("Acquire 'boot-time' no_halt_lock %ds\n", nohalt_timeout / HZ);
+	pr_info("[K] Acquire 'boot-time' no_halt_lock %ds\n", nohalt_timeout / HZ);
 }
 
 void __init msm_pm_init_sleep_status_data(
