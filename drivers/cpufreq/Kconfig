@@ -246,12 +246,8 @@ config CPU_FREQ_GOV_INTELLIDEMAND_2_PHASE
 	depends on CPU_FREQ_GOV_INTELLIDEMAND
 	help
 	  '2-phase' - This driver adds a new algo to save power
-config CPU_FREQ_GOV_INTELLIDEMAND_2_PHASE
-	tristate "'2-phase' power-efficiency ondemand algorithm"
-	depends on CPU_FREQ_GOV_INTELLIDEMAND
-	help
-	  '2-phase' - This driver adds a new algo to save power
-config CPUFREQ_LIMIT_MAX_FREQ
+
+config SEC_LIMIT_MAX_FREQ
 	bool "Limit Max Freq"
 	depends on CPU_FREQ_GOV_INTELLIDEMAND
 	help
