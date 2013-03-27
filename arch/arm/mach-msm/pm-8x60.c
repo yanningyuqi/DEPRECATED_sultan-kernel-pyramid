@@ -657,7 +657,7 @@ static void msm_pm_retention(void)
 	WARN_ON(ret);
 }
 
-static bool msm_pm_spm_power_collapse(
+static bool __ref msm_pm_spm_power_collapse(
 	unsigned int cpu, bool from_idle, bool notify_rpm)
 {
 	void *entry;
@@ -868,6 +868,7 @@ int msm_pm_idle_prepare(struct cpuidle_device *dev)
 
 		switch (mode) {
 		case MSM_PM_SLEEP_MODE_POWER_COLLAPSE:
+		case MSM_PM_SLEEP_MODE_RETENTION:
 			if (!allow)
 				break;
 
@@ -892,11 +893,6 @@ int msm_pm_idle_prepare(struct cpuidle_device *dev)
 				allow = false;
 				break;
 			}
-			/* fall through */
-
-		case MSM_PM_SLEEP_MODE_RETENTION:
-			if (!allow)
-				break;
 			/* fall through */
 
 		case MSM_PM_SLEEP_MODE_WAIT_FOR_INTERRUPT:
