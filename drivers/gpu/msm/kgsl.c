@@ -335,21 +335,6 @@ static void kgsl_timestamp_expired(struct work_struct *work)
 			break;
 	}
 
-			list_del(&event->list);
-			kfree(event);
-		}
-
-		/*
-		 * Keep looping until we hit an event which has not
-		 * passed and then we write a dummy interrupt.
-		 * mark_next_event will return 1 for every event
-		 * that has passed and return 0 for the event which has not
-		 * passed yet.
-		 */
-		if (_mark_next_event(device, &device->events) == 0)
-			break;
-	}
-
 	mutex_unlock(&device->mutex);
 }
 
