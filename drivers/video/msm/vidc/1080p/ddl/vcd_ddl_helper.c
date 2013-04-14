@@ -10,15 +10,14 @@
  * GNU General Public License for more details.
  *
  */
-
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 #include <linux/ion.h>
 #endif
-
 #include <mach/msm_memtypes.h>
 #include "vcd_ddl.h"
 #include "vcd_ddl_shared_mem.h"
 #include "vcd_res_tracker_api.h"
+
 
 struct ddl_context *ddl_get_context(void)
 {
@@ -482,9 +481,7 @@ struct ddl_client_context *ddl_get_current_ddl_client_for_command(
 
 u32 ddl_get_yuv_buf_size(u32 width, u32 height, u32 format)
 {
-	/* HTC_START (klockwork issue)*/
-	u32 mem_size, width_round_up, height_round_up, align = 0;
-	/* HTC_END */
+	u32 mem_size, width_round_up, height_round_up, align;
 
 	width_round_up  = width;
 	height_round_up = height;
@@ -654,6 +651,7 @@ u32 ddl_allocate_dec_hw_buffers(struct ddl_client_context *ddl)
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 	struct ddl_context *ddl_context = ddl->ddl_context;
 #endif
+
 	dec_bufs = &ddl->codec_data.decoder.hw_bufs;
 	ddl_calc_dec_hw_buffers_size(ddl->codec_data.decoder.
 		codec.codec, width, height, dpb, &buf_size);

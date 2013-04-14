@@ -31,6 +31,7 @@
 #include <media/msm/vidc_type.h>
 #include <media/msm/vcd_api.h>
 #include <media/msm/vidc_init.h>
+#include "vcd_res_tracker_api.h"
 #include "venc_internal.h"
 
 #if DEBUG
@@ -1782,6 +1783,7 @@ u32 vid_enc_set_recon_buffers(struct video_client_ctx *client_ctx,
 	size_t ion_len = -1;
 	unsigned long phy_addr;
 #endif
+
 	if (!client_ctx || !venc_recon) {
 		pr_err("%s() Invalid params", __func__);
 		return false;

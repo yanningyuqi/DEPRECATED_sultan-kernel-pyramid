@@ -502,7 +502,7 @@ u32 res_trk_power_down(void)
 {
 	VCDRES_MSG_LOW("clk_regime_rail_disable");
 	res_trk_pmem_unmap(&resource_context.firmware_addr);
-//	res_trk_pmem_free(&resource_context.firmware_addr);
+	res_trk_pmem_free(&resource_context.firmware_addr);
 #ifdef CONFIG_MSM_BUS_SCALING
 	msm_bus_scale_client_update_request(resource_context.pcl, 0);
 	msm_bus_scale_unregister_client(resource_context.pcl);
@@ -805,7 +805,7 @@ fail_alloc:
 void res_trk_release_fw_addr(void)
 {
 	res_trk_pmem_unmap(&resource_context.firmware_addr);
-	//res_trk_pmem_free(&resource_context.firmware_addr);
+	res_trk_pmem_free(&resource_context.firmware_addr);
 }
 
 int res_trk_check_for_sec_session(void)
