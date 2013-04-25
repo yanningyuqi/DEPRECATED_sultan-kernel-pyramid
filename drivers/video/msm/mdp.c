@@ -1528,6 +1528,7 @@ static int mdp_probe(struct platform_device *pdev)
 		mdp4_display_intf_sel(if_no, DSI_CMD_INTF);
 		mfd->lut_update = mdp_lut_update_nonlcdc;
 		mfd->do_histogram = mdp_do_histogram;
+		mfd->get_gamma_curvy = mdp_get_gamma_curvy;
 		mfd->lut_update = mdp_lut_update_nonlcdc;
 		mdp_config_vsync(mfd);
 		break;
