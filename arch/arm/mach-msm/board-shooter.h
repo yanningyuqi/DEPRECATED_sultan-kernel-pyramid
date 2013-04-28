@@ -12,12 +12,12 @@
  * GNU General Public License for more details.
  */
 
-#ifndef __ARCH_ARM_MACH_MSM_BOARD_shooter_H
-#define __ARCH_ARM_MACH_MSM_BOARD_shooter_H
+#ifndef __ARCH_ARM_MACH_MSM_BOARD_PYRAMID_H
+#define __ARCH_ARM_MACH_MSM_BOARD_PYRAMID_H
 
 #include <mach/board.h>
 
-#define shooter_PROJECT_NAME	"shooter"
+#define PYRAMID_PROJECT_NAME	"pyramid"
 
 #define MSM_RAM_CONSOLE_BASE	MSM_HTC_RAM_CONSOLE_PHYS
 #define MSM_RAM_CONSOLE_SIZE	MSM_HTC_RAM_CONSOLE_SIZE
@@ -32,69 +32,46 @@
 #define QCE_0_BASE		0x18500000
 #endif
 
-#ifdef CONFIG_FB_MSM_LCDC_DSUB
-/* VGA = 1440 x 900 x 4(bpp) x 2(pages)
-   prim = 1024 x 600 x 4(bpp) x 2(pages)
-   This is the difference. */
-#define MSM_FB_DSUB_PMEM_ADDER (0x9E3400-0x4B0000)
-#else
-#define MSM_FB_DSUB_PMEM_ADDER (0)
-#endif
-
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MSM_FB_PRIM_BUF_SIZE \
-	(roundup((960 * 540 * 4), 4096) * 3) /* 4 bpp x 3 pages */
+		(roundup((960 * 540 * 4), 4096) * 3) /* 4 bpp x 3 pages */
 #else
 #define MSM_FB_PRIM_BUF_SIZE \
-	(roundup((960 * 540 * 4), 4096) * 2) /* 4 bpp x 2 pages */
+		(roundup((960 * 540 * 4), 4096) * 2) /* 4 bpp x 2 pages */
 #endif
 
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
+#define MSM_FB_EXT_BUF_SIZE  \
+		(roundup((1920 * 1080 * 2), 4096) * 1) /* 2 bpp x 1 page */
+#else
+#define MSM_FB_EXT_BUF_SIZE	0
+#endif
 
 #ifdef CONFIG_FB_MSM_OVERLAY_WRITEBACK
 /* width x height x 3 bpp x 2 frame buffer */
 #define MSM_FB_WRITEBACK_SIZE roundup((960 * 540 * 3 * 2), 4096)
-#define MSM_FB_WRITEBACK_OFFSET	0
+#define MSM_FB_WRITEBACK_OFFSET 0
 #else
-#define MSM_FB_WRITEBACK_SIZE	0
-#define MSM_FB_WRITEBACK_OFFSET	0
+#define MSM_FB_WRITEBACK_SIZE   0
+#define MSM_FB_WRITEBACK_OFFSET 0
 #endif
 
-#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
-/* prim = 1024 x 600 x 4(bpp) x 2(pages)
- * hdmi = 1920 x 1080 x 2(bpp) x 1(page)
- * Note: must be multiple of 4096 */
-#define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE + 0x3F4800 + MSM_FB_DSUB_PMEM_ADDER, 4096)
-#elif defined(CONFIG_FB_MSM_TVOUT)
-/* prim = 1024 x 600 x 4(bpp) x 2(pages)
- * tvout = 720 x 576 x 2(bpp) x 2(pages)
- * Note: must be multiple of 4096 */
-#define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE + 0x195000 + MSM_FB_DSUB_PMEM_ADDER, 4096)
-#else /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
-#define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE + MSM_FB_DSUB_PMEM_ADDER, 4096)
-#endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
-#define MSM_OVERLAY_BLT_SIZE   roundup(960 * ALIGN(540, 32) * 3 * 2, 4096)
+/* Note: must be multiple of 4096 */
+#define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE + MSM_FB_EXT_BUF_SIZE, 4096)
 
-#define MSM_ION_HEAP_NUM	8
-#define MSM_ION_AUDIO_SIZE	MSM_PMEM_AUDIO_SIZE
-#define MSM_ION_SF_SIZE 	0x5000000 /* 80 Mbytes */
-#define MSM_ION_CAMERA_SIZE	MSM_PMEM_ADSP_SIZE
-#define MSM_ION_MM_FW_SIZE	0x200000 /* (2MB) */
-#define MSM_ION_MM_SIZE		0x3600000 /* (54MB) */
-#define MSM_ION_MFC_SIZE	SZ_8K
-#define MSM_ION_WB_SIZE		0x1E00000 /* 30MB */
-
-#define MSM_PMEM_SF_SIZE        0x4000000 /* 64 Mbytes */
-#define MSM_PMEM_ADSP_SIZE	0x239C000
+#define MSM_PMEM_MDP_SIZE	0x3A00000
+#define MSM_PMEM_ADSP_SIZE	0x1CB0000
+#define MSM_PMEM_ADSP2_SIZE	0x654000 /* 1152 * 1920 * 1.5 * 2 */
 #define MSM_PMEM_AUDIO_SIZE	0x239000
+#define MSM_PMEM_KERNEL_EBI1_SIZE	0xC7000
 
-#define MSM_OVERLAY_BLT_BASE	(MSM_ION_SF_BASE - MSM_OVERLAY_BLT_SIZE)
-#define MSM_PMEM_AUDIO_BASE	0x6BACA000
-#define MSM_ION_WB_BASE		0x40400000
-#define MSM_ION_SF_BASE		(0x70000000 - MSM_ION_SF_SIZE)
-#define MSM_FB_BASE             (0x6B000000)  /*MSM_PMEM_AUDIO_BASE is 0x6BACA000*/
-                                              /*to avoid alignment,  use 0x6BA00000 - 0xA00000*/
-
-#define MSM_PMEM_KERNEL_EBI1_BASE	(MSM_ION_AUDIO_BASE + MSM_ION_AUDIO_SIZE)
+#define MSM_FB_WRITEBACK_BASE	(0x45C00000)
+#define MSM_PMEM_AUDIO_BASE	(0x46400000)
+#define MSM_PMEM_ADSP_BASE	(0x6D600000)
+#define MSM_PMEM_ADSP2_BASE	(MSM_PMEM_ADSP_BASE + MSM_PMEM_ADSP_SIZE)
+#define MSM_FB_BASE		(0x70300000 - MSM_FB_SIZE)
+#define MSM_PMEM_MDP_BASE	(0x40400000)
+#define MSM_PMEM_KERNEL_EBI1_BASE	(MSM_PMEM_AUDIO_BASE + MSM_PMEM_AUDIO_SIZE)
 
 #define MSM_SMI_BASE          0x38000000
 #define MSM_SMI_SIZE          0x4000000
@@ -115,181 +92,105 @@
 #define MSM_PMEM_SMIPOOL_SIZE USER_SMI_SIZE
 
 #define PHY_BASE_ADDR1  0x48000000
-#define SIZE_ADDR1      0x23000000
-
+#define SIZE_ADDR1      0x25600000
 
 /* GPIO definition */
 
 /* Direct Keys */
-#define SHOOTER_GPIO_SW_LCM_3D       (64)
-#define SHOOTER_GPIO_SW_LCM_2D       (68)
-#define SHOOTER_GPIO_KEY_VOL_DOWN    (103)
-#define SHOOTER_GPIO_KEY_VOL_UP      (104)
-#define SHOOTER_GPIO_KEY_CAM_STEP2   (115)
-#define SHOOTER_GPIO_KEY_CAM_STEP1   (123)
-#define SHOOTER_GPIO_KEY_POWER       (125)
+#define PYRAMID_GPIO_KEY_POWER          (125)
 
 /* Battery */
-#define shooter_GPIO_MBAT_IN            (61)
-#define shooter_GPIO_CHG_INT		(126)
+#define PYRAMID_GPIO_MBAT_IN            (61)
+#define PYRAMID_GPIO_CHG_INT		(126)
 
 /* Wifi */
-#define shooter_GPIO_WIFI_IRQ              (46)
-#define shooter_GPIO_WIFI_SHUTDOWN_N       (96)
-
-/* WiMax */
-#define SHOOTER_GPIO_WIMAX_UART_SIN        (41)
-#define SHOOTER_GPIO_WIMAX_UART_SOUT       (42)
-#define SHOOTER_GPIO_V_WIMAX_1V2_RF_EN     (43)
-#define SHOOTER_GPIO_WIMAX_EXT_RST         (49)
-#define SHOOTER_GPIO_V_WIMAX_DVDD_EN       (94)
-#define SHOOTER_GPIO_V_WIMAX_PVDD_EN       (105)
-#define SHOOTER_GPIO_WIMAX_SDIO_D0         (143)
-#define SHOOTER_GPIO_WIMAX_SDIO_D1         (144)
-#define SHOOTER_GPIO_WIMAX_SDIO_D2         (145)
-#define SHOOTER_GPIO_WIMAX_SDIO_D3         (146)
-#define SHOOTER_GPIO_WIMAX_SDIO_CMD        (151)
-#define SHOOTER_GPIO_WIMAX_SDIO_CLK_CPU    (152)
-#define SHOOTER_GPIO_CPU_WIMAX_SW          (156)
-#define SHOOTER_GPIO_CPU_WIMAX_UART_EN     (157)
-
+#define PYRAMID_GPIO_WIFI_IRQ              (46)
+#define PYRAMID_GPIO_WIFI_SHUTDOWN_N       (96)
 /* Sensors */
-#define shooter_SENSOR_I2C_SDA		(72)
-#define shooter_SENSOR_I2C_SCL		(73)
-#define shooter_GYRO_INT               (127)
-#define shooter_ECOMPASS_INT           (128)
-#define shooter_GSENSOR_INT           (129)
+#define PYRAMID_SENSOR_I2C_SDA		(72)
+#define PYRAMID_SENSOR_I2C_SCL		(73)
+#define PYRAMID_GYRO_INT               (127)
+#define PYRAMID_ECOMPASS_INT           (128)
+#define PYRAMID_GSENSOR_INT           (129)
 
 /* Microp */
 
 /* TP */
-#define shooter_TP_I2C_SDA           (51)
-#define shooter_TP_I2C_SCL           (52)
-#define shooter_TP_ATT_N             (65)
-#define shooter_TP_ATT_N_XC          (57)
-
+#define PYRAMID_TP_I2C_SDA           (51)
+#define PYRAMID_TP_I2C_SCL           (52)
+#define PYRAMID_TP_ATT_N             (65)
+#define PYRAMID_TP_ATT_N_XB       (50)
 
 /* LCD */
-#define GPIO_LCM_ID	50
-#define GPIO_LCM_RST_N	66
+#define GPIO_LCM_RST_N			(66)
+#define GPIO_LCM_ID			(50)
 
 /* Audio */
-#define SHOOTER_AUD_CODEC_RST        (67)
-#define SHOOTER_AUD_CDC_LDO_SEL      (116)
-#define SHOOTER_AUD_MIC_SEL        PMGPIO(14)
-#define SHOOTER_AUD_SPK_ENO        PMGPIO(19)
-#define SHOOTER_AUD_HANDSET_ENO    PMGPIO(18)
+#define PYRAMID_AUD_CODEC_RST        (67)
+
 /* BT */
-#define shooter_GPIO_BT_HOST_WAKE      (45)
-#define shooter_GPIO_BT_UART1_TX       (53)
-#define shooter_GPIO_BT_UART1_RX       (54)
-#define shooter_GPIO_BT_UART1_CTS      (55)
-#define shooter_GPIO_BT_UART1_RTS      (56)
-#define shooter_GPIO_BT_SHUTDOWN_N     (100)
-#define shooter_GPIO_BT_CHIP_WAKE      (130)
-#define shooter_GPIO_BT_RESET_N        (142)
+#define PYRAMID_GPIO_BT_HOST_WAKE      (45)
+#define PYRAMID_GPIO_BT_UART1_TX       (53)
+#define PYRAMID_GPIO_BT_UART1_RX       (54)
+#define PYRAMID_GPIO_BT_UART1_CTS      (55)
+#define PYRAMID_GPIO_BT_UART1_RTS      (56)
+#define PYRAMID_GPIO_BT_SHUTDOWN_N     (100)
+#define PYRAMID_GPIO_BT_CHIP_WAKE      (130)
+#define PYRAMID_GPIO_BT_RESET_N        (142)
 
 /* USB */
-#define shooter_GPIO_MHL_WAKE_UP        (62)
-#define shooter_GPIO_USB_ID        (63)
-#define shooter_GPIO_MHL_RESET        (70)
-#define shooter_GPIO_MHL_INT        (71)
-#define shooter_GPIO_MHL_USB_SWITCH        (99)
-#define shooter_GPIO_MHL_USB_EN         (139)
+#define PYRAMID_GPIO_MHL_WAKE_UP        (62)
+#define PYRAMID_GPIO_USB_ID        (63)
+#define PYRAMID_GPIO_MHL_RESET        (70)
+#define PYRAMID_GPIO_MHL_INT        (71)
+#define PYRAMID_GPIO_MHL_USB_EN         (139)
+#define PYRAMID_GPIO_MHL_USB_SWITCH        (99)
+
+/* Camera */
+#define PYRAMID_CAM_CAM1_ID           (10)
+#define PYRAMID_CAM_I2C_SDA           (47)
+#define PYRAMID_CAM_I2C_SCL           (48)
 
 /* General */
-#define shooter_GENERAL_I2C_SDA		(59)
-#define shooter_GENERAL_I2C_SCL		(60)
+#define PYRAMID_GENERAL_I2C_SDA		(59)
+#define PYRAMID_GENERAL_I2C_SCL		(60)
 
 /* Flashlight */
-#define shooter_FLASH_EN             (29)
-#define shooter_TORCH_EN             (30)
+#define PYRAMID_FLASH_EN             (29)
+#define PYRAMID_TORCH_EN             (30)
 
 /* Accessory */
-#define shooter_GPIO_AUD_HP_DET        (31)
+#define PYRAMID_GPIO_AUD_HP_DET        (31)
 
 /* SPI */
-#define shooter_SPI_DO                 (33)
-#define shooter_SPI_DI                 (34)
-#define shooter_SPI_CS                 (35)
-#define shooter_SPI_CLK                (36)
-
-/* CAMERA SPI */
-#define SHOOTER_SP3D_SPI_DO                 (37)
-#define SHOOTER_SP3D_SPI_DI                 (38)
-#define SHOOTER_SP3D_SPI_CS                 (39)
-#define SHOOTER_SP3D_SPI_CLK                (40)
-
-/* CAMERA GPIO */
-#define SHOOTER_CAM_I2C_SDA           (47)
-#define SHOOTER_CAM_I2C_SCL           (48)
-
-#define SHOOTER_SP3D_GATE              (107)
-#define SHOOTER_SP3D_CORE_GATE         (58)
-#define SHOOTER_SP3D_SYS_RST           (102)
-#define SHOOTER_SP3D_PDX               (137)
-
-#define SHOOTER_S5K4E1_PD				(137)
-#define SHOOTER_S5K4E1_INTB				(102)
-#define SHOOTER_S5K4E1_VCM_PD			(58)
-
-#define SHOOTER_SP3D_MCLK		(32)
-#define SHOOTER_WEBCAM_STB		(140)
-#define SHOOTER_WEBCAM_RST		(138)
-#define SHOOTER_CAM_SEL			(141)
-
-/* LCM */
-#define SHOOTER_CTL_3D_1		(131)
-#define SHOOTER_CTL_3D_2		(132)
-#define SHOOTER_CTL_3D_3		(133)
-#define SHOOTER_CTL_3D_4		(134)
-#define SHOOTER_LCM_3D_PDz		(135)
+#define PYRAMID_SPI_DO                 (33)
+#define PYRAMID_SPI_DI                 (34)
+#define PYRAMID_SPI_CS                 (35)
+#define PYRAMID_SPI_CLK                (36)
 
 /* PMIC */
 
 /* PMIC GPIO definition */
 #define PMGPIO(x) (x-1)
-#define SHOOTER_3DLCM_PD           PMGPIO(20)
-#define shooter_AUD_QTR_RESET      PMGPIO(21)
-#define shooter_TP_RST             PMGPIO(23)
-#define shooter_GREEN_LED          PMGPIO(24)
-#define shooter_AMBER_LED          PMGPIO(25)
-#define SHOOTER_3DCLK              PMGPIO(26)
-#define shooter_AUD_MIC_SEL        PMGPIO(14)
-#define shooter_CHG_STAT	   PMGPIO(33)
-#define shooter_SDC3_DET           PMGPIO(34)
-#define shooter_PLS_INT            PMGPIO(22)
-#define shooter_AUD_REMO_PRES      PMGPIO(37)
-#define shooter_AUD_REMO_EN	   PMGPIO(15)
-#define shooter_WIFI_BT_SLEEP_CLK  PMGPIO(38)
-#define SHOOTER_TORCH_SET1         PMGPIO(32)
-#define SHOOTER_TORCH_SET2         PMGPIO(31)
-#define SHOOTER_WIMAX_HOST_WAKEUP  PMGPIO(17)
-#define SHOOTER_WIMAX_DEBUG12      PMGPIO(16)
-#define SHOOTER_WIMAX_DEBUG14_XA   PMGPIO(28)
-#define SHOOTER_WIMAX_DEBUG15_XA   PMGPIO(30)
-#define SHOOTER_WIMAX_DEBUG14      PMGPIO(35)
-#define SHOOTER_WIMAX_DEBUG15      PMGPIO(36)
+#define PYRAMID_VOL_UP             PMGPIO(16)
+#define PYRAMID_VOL_DN             PMGPIO(17)
+#define PYRAMID_AUD_HP_EN          PMGPIO(18)
+#define PYRAMID_HAP_ENABLE         PMGPIO(19)
+#define PYRAMID_AUD_QTR_RESET      PMGPIO(21)
+#define PYRAMID_TP_RST             PMGPIO(23)
+#define PYRAMID_GREEN_LED          PMGPIO(24)
+#define PYRAMID_AMBER_LED          PMGPIO(25)
+#define PYRAMID_AUD_MIC_SEL        PMGPIO(26)
+#define PYRAMID_CHG_STAT	   PMGPIO(33)
+#define PYRAMID_SDC3_DET           PMGPIO(34)
+#define PYRAMID_PLS_INT            PMGPIO(35)
+#define PYRAMID_AUD_REMO_PRES      PMGPIO(37)
+#define PYRAMID_WIFI_BT_SLEEP_CLK  PMGPIO(38)
 
-/* Macros assume PMIC GPIOs start at 0 */
-#define PM8058_GPIO_BASE			NR_MSM_GPIOS
-#define PM8058_GPIO_PM_TO_SYS(pm_gpio)		(pm_gpio + PM8058_GPIO_BASE)
-#define PM8058_GPIO_SYS_TO_PM(sys_gpio)		(sys_gpio - PM8058_GPIO_BASE)
-#define PM8058_MPP_BASE				(PM8058_GPIO_BASE + PM8058_GPIOS)
-#define PM8058_MPP_PM_TO_SYS(pm_gpio)		(pm_gpio + PM8058_MPP_BASE)
-#define PM8058_MPP_SYS_TO_PM(sys_gpio)		(sys_gpio - PM8058_MPP_BASE)
 
-#define PM8901_GPIO_BASE			(PM8058_GPIO_BASE + \
-		PM8058_GPIOS + PM8058_MPPS)
-#define PM8901_GPIO_PM_TO_SYS(pm_gpio)		(pm_gpio + PM8901_GPIO_BASE)
-#define PM8901_GPIO_SYS_TO_PM(sys_gpio)		(sys_gpio - PM901_GPIO_BASE)
-#define PM8901_IRQ_BASE				(PM8058_IRQ_BASE + \
-		NR_PMIC8058_IRQS)
+int __init pyramid_init_mmc(void);
+void __init pyramid_audio_init(void);
+int __init pyramid_init_keypad(void);
+int __init pyramid_wifi_init(void);
 
-int __init shooter_init_mmc(void);
-void __init shooter_audio_init(void);
-int __init shooter_init_keypad(void);
-int __init shooter_wifi_init(void);
-int __init shooter_init_panel(struct resource *res, size_t size);
-
-#endif /* __ARCH_ARM_MACH_MSM_BOARD_shooter_H */
+#endif /* __ARCH_ARM_MACH_MSM_BOARD_PYRAMID_H */
