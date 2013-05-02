@@ -1,6 +1,6 @@
 /* Qualcomm Crypto Engine driver API
  *
- * Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -71,6 +71,7 @@ enum qce_hash_alg_enum {
 	QCE_HASH_SHA1_HMAC   = 2,
 	QCE_HASH_SHA256_HMAC = 3,
 	QCE_HASH_AES_CMAC = 4,
+	QCE_AEAD_SHA1_HMAC = 5,
 	QCE_HASH_LAST
 };
 
@@ -110,6 +111,9 @@ struct ce_hw_support {
 	bool aes_xts;
 	bool aes_ccm;
 	bool ota;
+	bool aligned_only;
+	bool bam;
+	bool is_shared;
 };
 
 /* Sha operation parameters */
@@ -156,5 +160,7 @@ int qce_aead_req(void *handle, struct qce_req *req);
 int qce_ablk_cipher_req(void *handle, struct qce_req *req);
 int qce_hw_support(void *handle, struct ce_hw_support *support);
 int qce_process_sha_req(void *handle, struct qce_sha_req *s_req);
+int qce_enable_clk(void *handle);
+int qce_disable_clk(void *handle);
 
 #endif /* __CRYPTO_MSM_QCE_H */
