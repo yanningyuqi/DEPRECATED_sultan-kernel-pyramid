@@ -1006,7 +1006,7 @@ config CC_OPTIMIZE_FAST
 	bool "Use -Ofast"
 	help
 	   Enabling this option will pass "-Ofast" instead of "-Os" or "-O2" or "-O3" to gcc
-	   resulting in a large sized kernel, speed optimized.
+	   resulting in a large sized kernel, speed optimized. Note that "-Ofast" optimization may cause issues if the entire kernel is built 		   with it as it uses the "-ffast-math" optimization flag. "-ffast-math", as stated on the GCC website, "can result in incorrect 	    output for programs that depend on an exact implementation of IEEE or ISO rules/specifications for math functions".
 
 endchoice	
 
