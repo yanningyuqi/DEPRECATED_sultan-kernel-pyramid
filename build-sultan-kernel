@@ -17,6 +17,10 @@ rm -f modules-jb.zip
 rm -f zImage.zip
 zip -r modules-jb.zip /home/sultan/Documents/modules-jb/*
 zip zImage.zip arch/arm/boot/zImage
+rm -f /home/sultan/Documents/Pyramid_AOSP/modules-jb.zip
+rm -f /home/sultan/Documents/Pyramid_AOSP/zImage.zip
+cp modules-jb.zip /home/sultan/Documents/Pyramid_AOSP
+cp zImage.zip /home/sultan/Documents/Pyramid_AOSP
 
 
 
