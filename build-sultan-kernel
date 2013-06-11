@@ -7,20 +7,24 @@ export ARCH=arm
 export CROSS_COMPILE=/home/sultan/Downloads/arm-cortex_a8-linux-gnueabi-linaro_4.8.1-2013.05/bin/arm-cortex_a8-linux-gnueabi-
 
 ## Build Sultan kernel
+rm -f /home/sultan/sultan-kernel-bruce-linaro3/arch/arm/boot/zImage
 make -j$MAKE ARCH=arm
 sleep 1
-echo Copying Modules
+echo Copying and zipping modules plus zImage
 sleep 1
 rm -f /home/sultan/Documents/modules-jb/*
 cp -a $(find . -name *.ko -print |grep -v initramfs) /home/sultan/Documents/modules-jb
-rm -f modules-jb.zip
-rm -f zImage.zip
-zip -r modules-jb.zip /home/sultan/Documents/modules-jb/*
-zip zImage.zip arch/arm/boot/zImage
+rm -f /home/sultan/Documents/modules-jb/modules-jb.zip
+rm -f /home/sultan/sultan-kernel-bruce-linaro3/arch/arm/boot/zImage.zip
+cd /home/sultan/Documents/modules-jb
+zip modules-jb.zip *
+cd /home/sultan/sultan-kernel-bruce-linaro3/arch/arm/boot
+zip zImage.zip zImage
 rm -f /home/sultan/Documents/Pyramid_AOSP/modules-jb.zip
 rm -f /home/sultan/Documents/Pyramid_AOSP/zImage.zip
-cp modules-jb.zip /home/sultan/Documents/Pyramid_AOSP
-cp zImage.zip /home/sultan/Documents/Pyramid_AOSP
+cp /home/sultan/Documents/modules-jb/modules-jb.zip /home/sultan/Documents/Pyramid_AOSP
+cp /home/sultan/sultan-kernel-bruce-linaro3/arch/arm/boot/zImage.zip /home/sultan/Documents/Pyramid_AOSP
+cd /home/sultan/sultan-kernel-bruce-linaro3
 
 
 
