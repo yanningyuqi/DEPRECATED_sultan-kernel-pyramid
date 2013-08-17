@@ -3055,7 +3055,7 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	mem_cgroup_commit_charge_swapin(page, ptr);
 
 	swap_free(entry);
-	if ((vma->vm_flags & VM_LOCKED) || PageMlocked(page))
+	if (vm_swap_full() || (vma->vm_flags & VM_LOCKED) || PageMlocked(page))
 		try_to_free_swap(page);
 	unlock_page(page);
 	if (swapcache) {
@@ -3831,7 +3831,7 @@ int generic_access_phys(struct vm_area_struct *vma, unsigned long addr,
 static int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long addr, void *buf, int len, int write)
 {
-	struct vm_area_struct *vma;
+	struct vm_area_struct *vma = NULL;
 	void *old_buf = buf;
 
 	down_read(&mm->mmap_sem);

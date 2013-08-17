@@ -224,30 +224,23 @@ static ssize_t ashmem_read(struct file *file, char __user *buf,
 
 	/* If size is not set, or set to 0, always return EOF. */
 	if (asma->size == 0) {
-		goto out_unlock;
+		goto out;
         }
 
 	if (!asma->file) {
 		ret = -EBADF;
-		goto out_unlock;
+		goto out;
 	}
 
-	mutex_unlock(&ashmem_mutex);
-
-	/*
-	 * asma and asma->file are used outside the lock here.  We assume
-	 * once asma->file is set it will never be changed, and will not
-	 * be destroyed until all references to the file are dropped and
-	 * ashmem_release is called.
-	 */
 	ret = asma->file->f_op->read(asma->file, buf, len, pos);
-	if (ret >= 0) {
-		/** Update backing file pos, since f_ops->read() doesn't */
-		asma->file->f_pos = *pos;
+	if (ret < 0) {
+		goto out;
 	}
-	return ret;
 
-out_unlock:
+	/** Update backing file pos, since f_ops->read() doesn't */
+	asma->file->f_pos = *pos;
+
+out:
 	mutex_unlock(&ashmem_mutex);
 	return ret;
 }
@@ -368,7 +361,11 @@ static int ashmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	if (!sc->nr_to_scan)
 		return lru_count;
 
-	mutex_lock(&ashmem_mutex);
+	/* If our mutex is held, we are recursing into ourselves, so bail out */
+	if (!mutex_trylock(&ashmem_mutex)) {
+		return -1;
+	}
+
 	list_for_each_entry_safe(range, next, &ashmem_lru_list, lru) {
 		struct inode *inode = range->asma->file->f_dentry->d_inode;
 		loff_t start = range->pgstart * PAGE_SIZE;
@@ -417,48 +414,50 @@ out:
 
 static int set_name(struct ashmem_area *asma, void __user *name)
 {
-	char lname[ASHMEM_NAME_LEN];
-	int len;
 	int ret = 0;
 
-	len = strncpy_from_user(lname, name, ASHMEM_NAME_LEN);
-	if (len < 0)
-		return len;
-	if (len == ASHMEM_NAME_LEN)
-		lname[ASHMEM_NAME_LEN - 1] = '\0';
 	mutex_lock(&ashmem_mutex);
 
 	/* cannot change an existing mapping's name */
-	if (unlikely(asma->file))
+	if (unlikely(asma->file)) {
 		ret = -EINVAL;
-	else
-		strcpy(asma->name + ASHMEM_NAME_PREFIX_LEN, lname);
+		goto out;
+	}
 
+	if (unlikely(copy_from_user(asma->name + ASHMEM_NAME_PREFIX_LEN,
+				    name, ASHMEM_NAME_LEN)))
+		ret = -EFAULT;
+	asma->name[ASHMEM_FULL_NAME_LEN-1] = '\0';
+
+out:
 	mutex_unlock(&ashmem_mutex);
+
 	return ret;
 }
 
 static int get_name(struct ashmem_area *asma, void __user *name)
 {
 	int ret = 0;
-	char lname[ASHMEM_NAME_LEN];
-	size_t len;
 
 	mutex_lock(&ashmem_mutex);
 	if (asma->name[ASHMEM_NAME_PREFIX_LEN] != '\0') {
+		size_t len;
+
 		/*
 		 * Copying only `len', instead of ASHMEM_NAME_LEN, bytes
 		 * prevents us from revealing one user's stack to another.
 		 */
 		len = strlen(asma->name + ASHMEM_NAME_PREFIX_LEN) + 1;
-		memcpy(lname, asma->name + ASHMEM_NAME_PREFIX_LEN, len);
+		if (unlikely(copy_to_user(name,
+				asma->name + ASHMEM_NAME_PREFIX_LEN, len)))
+			ret = -EFAULT;
 	} else {
-		len = strlen(ASHMEM_NAME_DEF) + 1;
-		memcpy(lname, ASHMEM_NAME_DEF, len);
+		if (unlikely(copy_to_user(name, ASHMEM_NAME_DEF,
+					  sizeof(ASHMEM_NAME_DEF))))
+			ret = -EFAULT;
 	}
 	mutex_unlock(&ashmem_mutex);
-	if (unlikely(copy_to_user(name, lname, len)))
-		ret = -EFAULT;
+
 	return ret;
 }
 
@@ -635,6 +634,7 @@ static int ashmem_pin_unpin(struct ashmem_area *asma, unsigned long cmd,
 	return ret;
 }
 
+#ifdef CONFIG_OUTER_CACHE
 static unsigned int virtaddr_to_physaddr(unsigned int virtaddr)
 {
 	unsigned int physaddr = 0;
@@ -671,63 +671,30 @@ done:
 	physaddr <<= PAGE_SHIFT;
 	return physaddr;
 }
+#endif
 
 static int ashmem_cache_op(struct ashmem_area *asma,
 	void (*cache_func)(unsigned long vstart, unsigned long length,
 				unsigned long pstart))
 {
-	int ret = 0;
-	struct vm_area_struct *vma;
+#ifdef CONFIG_OUTER_CACHE
 	unsigned long vaddr;
-
-	if (!asma->vm_start)
-		return -EINVAL;
-
-	down_read(&current->mm->mmap_sem);
-	vma = find_vma(current->mm, asma->vm_start);
-	if (!vma) {
-		ret = -EINVAL;
-		goto done;
-	}
-	if (vma->vm_file != asma->file) {
-		ret = -EINVAL;
-		goto done;
-	}
-	if ((asma->vm_start + asma->size) > (vma->vm_start + vma->vm_end)) {
-		ret = -EINVAL;
-		goto done;
-	}
+#endif
+	mutex_lock(&ashmem_mutex);
 #ifndef CONFIG_OUTER_CACHE
-	/* Check every virtual address in page unit have the mapping? */
-	for (vaddr = asma->vm_start; vaddr < asma->vm_start + asma->size;
-		vaddr += PAGE_SIZE) {
-		unsigned long physaddr;
-		physaddr = virtaddr_to_physaddr(vaddr);
-		if (!physaddr) {
-			pr_debug("ashmem_cache_op: Task(%s) try to operate unmapping VA(0x%lx)!\n", current->comm, vaddr);
-			ret = -EINVAL;
-			goto done;
-		}
-	}
 	cache_func(asma->vm_start, asma->size, 0);
 #else
 	for (vaddr = asma->vm_start; vaddr < asma->vm_start + asma->size;
 		vaddr += PAGE_SIZE) {
 		unsigned long physaddr;
 		physaddr = virtaddr_to_physaddr(vaddr);
-		if (!physaddr) {
-			pr_debug("ashmem_cache_op: Task(%s) try to operate unmapping VA(0x%lx)!\n", current->comm, vaddr);
-			ret = -EINVAL;
-			goto done;
-		}
+		if (!physaddr)
+			return -EINVAL;
 		cache_func(vaddr, PAGE_SIZE, physaddr);
 	}
 #endif
-done:
-	up_read(&current->mm->mmap_sem);
-	if (ret)
-		asma->vm_start = 0;
-	return ret;
+	mutex_unlock(&ashmem_mutex);
+	return 0;
 }
 
 static long ashmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
