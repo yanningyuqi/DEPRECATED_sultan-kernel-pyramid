@@ -34,22 +34,22 @@
 
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MSM_FB_PRIM_BUF_SIZE \
-		(roundup((960 * 540 * 4), 4096) * 3) /* 4 bpp x 3 pages */
+		0x5F1000 /* 4 bpp x 3 pages */ /*(roundup((960 * 540 * 4), 4096) * 3)*/
 #else
 #define MSM_FB_PRIM_BUF_SIZE \
-		(roundup((960 * 540 * 4), 4096) * 2) /* 4 bpp x 2 pages */
+		0x3F6000 /* 4 bpp x 2 pages */ /*(roundup((960 * 540 * 4), 4096) * 2)*/
 #endif
 
 #ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
 #define MSM_FB_EXT_BUF_SIZE  \
-		(roundup((1920 * 1080 * 2), 4096) * 1) /* 2 bpp x 1 page */
+		0x3F5000 /* 2 bpp x 1 page */ /*(roundup((1920 * 1080 * 2), 4096) * 1)*/
 #else
 #define MSM_FB_EXT_BUF_SIZE	0
 #endif
 
 #ifdef CONFIG_FB_MSM_OVERLAY_WRITEBACK
 /* width x height x 3 bpp x 2 frame buffer */
-#define MSM_FB_WRITEBACK_SIZE roundup((960 * 540 * 3 * 2), 4096)
+#define MSM_FB_WRITEBACK_SIZE 0x2F8000 /*roundup((960 * 540 * 3 * 2), 4096)*/
 #define MSM_FB_WRITEBACK_OFFSET 0
 #else
 #define MSM_FB_WRITEBACK_SIZE   0
@@ -57,7 +57,7 @@
 #endif
 
 /* Note: must be multiple of 4096 */
-#define MSM_FB_SIZE roundup(MSM_FB_PRIM_BUF_SIZE + MSM_FB_EXT_BUF_SIZE, 4096)
+#define MSM_FB_SIZE 0x9E6000 /*roundup(MSM_FB_PRIM_BUF_SIZE + MSM_FB_EXT_BUF_SIZE, 4096)*/
 
 #define MSM_PMEM_MDP_SIZE	0x3A00000
 #define MSM_PMEM_ADSP_SIZE	0x1CB0000
@@ -66,7 +66,7 @@
 #define MSM_FB_WRITEBACK_BASE	(0x45C00000)
 #define MSM_PMEM_AUDIO_BASE	(0x46400000)
 #define MSM_PMEM_ADSP_BASE	(0x6D600000)
-#define MSM_FB_BASE		(0x70300000 - MSM_FB_SIZE)
+#define MSM_FB_BASE		(0x6F91A000) /*(0x70300000 - MSM_FB_SIZE)*/
 #define MSM_PMEM_MDP_BASE	(0x40400000)
 
 #define MSM_SMI_BASE          0x38000000
