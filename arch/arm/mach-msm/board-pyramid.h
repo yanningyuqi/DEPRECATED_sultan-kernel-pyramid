@@ -78,7 +78,7 @@
 /* SMI PMEM Region, as the video core will use offset address */
 /* from the Firmware base */
 #define KERNEL_SMI_BASE       (MSM_SMI_BASE)
-#define KERNEL_SMI_SIZE       0x280000
+#define KERNEL_SMI_SIZE       0x2A0000
 
 /* User space SMI PMEM Region for video core*/
 /* used for encoder, decoder input & output buffers  */
