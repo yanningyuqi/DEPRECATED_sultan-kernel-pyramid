@@ -1949,7 +1949,10 @@ static struct platform_device android_pmem_device = {
 static struct android_pmem_platform_data android_pmem_adsp_pdata = {
 	.name = "pmem_adsp",
 	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
-	.cached = 1,
+	.cached = 0,
+#ifdef CONFIG_PYRAMID_624MB_RAM
+	.memory_type = MEMTYPE_EBI0,
+#endif
 };
 
 static struct platform_device android_pmem_adsp_device = {
@@ -3509,8 +3512,8 @@ static void __init msm8x60_calculate_reserve_sizes(void)
 
 static int msm8x60_paddr_to_memtype(unsigned int paddr)
 {
-	if (paddr >= 0x40000000 && paddr < 0x60000000)
-		return MEMTYPE_EBI1;
+	if (paddr >= 0x40000000 && paddr < 0x70000000)
+		return MEMTYPE_EBI0;
 	if (paddr >= 0x38000000 && paddr < 0x40000000)
 		return MEMTYPE_SMI;
 	return MEMTYPE_NONE;
