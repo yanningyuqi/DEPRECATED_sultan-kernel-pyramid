@@ -1204,6 +1204,13 @@ choice
 	    prompt "Package 4"
 endchoice
 
+config PYRAMID_624MB_RAM
+	bool "Allocate 624MB of RAM to userspace"
+	default n
+	help
+	Use a custom memory map for the Pyramid
+	that allocates 624MB of RAM to userspace.
+
 config MSM_SMD0_WQ
 	bool "SMD0 TTY Workqueue"
 	depends on (MSM_SMD)
