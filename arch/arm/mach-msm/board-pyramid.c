@@ -1951,7 +1951,7 @@ static struct android_pmem_platform_data android_pmem_adsp_pdata = {
 	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
 	.cached = 0,
 #ifdef CONFIG_PYRAMID_624MB_RAM
-	.memory_type = MEMTYPE_EBI0,
+	.memory_type = MEMTYPE_EBI1,
 #endif
 };
 
@@ -3451,6 +3451,9 @@ static struct memtype_reserve msm8x60_reserve_table[] __initdata = {
 	[MEMTYPE_EBI0] = {
 		.flags	=	MEMTYPE_FLAGS_1M_ALIGN,
 	},
+	[MEMTYPE_EBI1] = {
+		.flags	=	MEMTYPE_FLAGS_FIXED,
+	},
 };
 
 #ifdef CONFIG_ANDROID_PMEM
@@ -3513,7 +3516,7 @@ static void __init msm8x60_calculate_reserve_sizes(void)
 static int msm8x60_paddr_to_memtype(unsigned int paddr)
 {
 	if (paddr >= 0x40000000 && paddr < 0x70000000)
-		return MEMTYPE_EBI0;
+		return MEMTYPE_EBI1;
 	if (paddr >= 0x38000000 && paddr < 0x40000000)
 		return MEMTYPE_SMI;
 	return MEMTYPE_NONE;
