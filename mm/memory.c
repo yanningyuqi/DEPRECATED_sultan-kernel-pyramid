@@ -1529,7 +1529,7 @@ split_fallthrough:
 	if (flags & FOLL_GET)
 		get_page_foll(page);
 	if (flags & FOLL_TOUCH) {
-		if (page && (flags & FOLL_WRITE) &&
+		if ((flags & FOLL_WRITE) &&
 		    !pte_dirty(pte) && !PageDirty(page))
 			set_page_dirty(page);
 		/*
@@ -3831,7 +3831,7 @@ int generic_access_phys(struct vm_area_struct *vma, unsigned long addr,
 static int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long addr, void *buf, int len, int write)
 {
-	struct vm_area_struct *vma = NULL;
+	struct vm_area_struct *vma;
 	void *old_buf = buf;
 
 	down_read(&mm->mmap_sem);

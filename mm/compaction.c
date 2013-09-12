@@ -372,7 +372,7 @@ static isolate_migrate_t isolate_migratepages(struct zone *zone,
 		}
 
 		if (!cc->sync)
-			mode |= ISOLATE_ASYNC_MIGRATE;
+			mode |= ISOLATE_CLEAN;
 
 		/* Try isolate the page */
 		if (__isolate_lru_page(page, mode, 0) != 0)
@@ -607,7 +607,7 @@ out:
 	return ret;
 }
 
-static unsigned long compact_zone_order(struct zone *zone,
+unsigned long compact_zone_order(struct zone *zone,
 				 int order, gfp_t gfp_mask,
 				 bool sync)
 {
