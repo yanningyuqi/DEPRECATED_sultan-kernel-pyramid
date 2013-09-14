@@ -139,7 +139,7 @@
 #define S5K3H1GX_READ_MIRROR_FLIP 0x03	/* with mirror/flip */
 
 #define Q8 0x00000100
-#define SENSOR_DEFAULT_CLOCK_RATE 24000000
+#define SENSOR_DEFAULT_CLOCK_RATE 30000000
 
 /*============================================================================
  TYPE DECLARATIONS
