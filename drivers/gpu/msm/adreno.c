@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2002,2007-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -293,12 +293,6 @@ static void adreno_setstate(struct kgsl_device *device,
 	struct adreno_context *adreno_ctx = NULL;
 
 	/*
-	 * Fix target freeze issue by adding TLB flush for each submit
-	 * on A20X based targets.
-	 */
-	if (adreno_is_a20x(adreno_dev))
-		flags |= KGSL_MMUFLAGS_TLBFLUSH;
-	/*
 	 * If possible, then set the state via the command stream to avoid
 	 * a CPU idle.  Otherwise, use the default setstate which uses register
 	 * writes For CFF dump we must idle and use the registers so that it is
@@ -419,7 +413,7 @@ adreno_getchipid(struct kgsl_device *device)
 	if (cpu_is_qsd8x50())
 		patchid = 1;
 	else if (cpu_is_msm8960() &&
-			SOCINFO_VERSION_MAJOR(soc_platform_version) == 3)
+			SOCINFO_VERSION_MAJOR(soc_platform_version) >= 3)
 		patchid = 6;
 
 	chipid |= (minorid << 8) | patchid;
@@ -578,10 +572,7 @@ static int adreno_start(struct kgsl_device *device, unsigned int init_ram)
 
 	adreno_regwrite(device, REG_RBBM_SOFT_RESET, 0x00000000);
 
-	if (adreno_is_a200(adreno_dev))
-		adreno_regwrite(device, REG_RBBM_CNTL, 0x0000FFFF);
-	else
-		adreno_regwrite(device, REG_RBBM_CNTL, 0x00004442);
+	adreno_regwrite(device, REG_RBBM_CNTL, 0x00004442);
 
 	if (adreno_is_a225(adreno_dev)) {
 		/* Enable large instruction store for A225 */
@@ -1019,7 +1010,7 @@ retry:
 		goto err;
 
 	/* now, wait for the GPU to finish its operations */
-	wait_time = jiffies + msecs_to_jiffies(ADRENO_IDLE_TIMEOUT);
+	wait_time = jiffies + ADRENO_IDLE_TIMEOUT;
 	wait_time_part = jiffies + msecs_to_jiffies(KGSL_TIMEOUT_PART);
 
 	while (time_before(jiffies, wait_time)) {
@@ -1042,7 +1033,7 @@ err:
 	KGSL_DRV_ERR(device, "spun too long waiting for RB to idle\n");
 	if (KGSL_STATE_DUMP_AND_RECOVER != device->state &&
 		!adreno_dump_and_recover(device)) {
-		wait_time = jiffies + msecs_to_jiffies(ADRENO_IDLE_TIMEOUT);
+		wait_time = jiffies + ADRENO_IDLE_TIMEOUT;
 		goto retry;
 	}
 	return -ETIMEDOUT;
@@ -1062,12 +1053,10 @@ static unsigned int adreno_isidle(struct kgsl_device *device)
 		GSL_RB_GET_READPTR(rb, &rb->rptr);
 		if (!device->active_cnt && (rb->rptr == rb->wptr)) {
 			/* Is the core idle? */
-			if (adreno_dev->gpudev->irq_pending(adreno_dev) == 0) {
-				adreno_regread(device, REG_RBBM_STATUS,
-							&rbbm_status);
-				if (rbbm_status == 0x110)
-					status = true;
-			}
+			adreno_regread(device, REG_RBBM_STATUS,
+					    &rbbm_status);
+			if (rbbm_status == 0x110)
+				status = true;
 		}
 	} else {
 		status = true;
@@ -1463,8 +1452,8 @@ static long adreno_ioctl(struct kgsl_device_private *dev_priv,
 
 static inline s64 adreno_ticks_to_us(u32 ticks, u32 gpu_freq)
 {
-	s64 ticksus = (s64)ticks*1000000;
-	return div_u64(ticksus, gpu_freq);
+	gpu_freq /= 1000000;
+	return ticks / gpu_freq;
 }
 
 static void adreno_power_stats(struct kgsl_device *device,
