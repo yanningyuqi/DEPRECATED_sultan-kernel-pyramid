@@ -25,6 +25,7 @@
 #include <linux/rbtree.h>
 #include <linux/ashmem.h>
 #include <linux/major.h>
+#include <linux/highmem.h>
 #ifdef CONFIG_KGSL_COMPAT
 #include <linux/ion.h>
 #else
