@@ -25,6 +25,7 @@
 #include <linux/ashmem.h>
 #include <linux/major.h>
 #include <linux/ion.h>
+#include <linux/highmem.h>
 
 #include "kgsl.h"
 #include "kgsl_debugfs.h"
