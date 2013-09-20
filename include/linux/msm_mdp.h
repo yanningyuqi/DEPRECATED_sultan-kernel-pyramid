@@ -465,6 +465,11 @@ struct msmfb_mixer_info_req {
 	struct mdp_mixer_info info[MAX_PIPE_PER_MIXER];
 };
 
+enum {
+	DISPLAY_SUBSYSTEM_ID,
+	ROTATOR_SUBSYSTEM_ID,
+};
+
 struct msmfb_usb_projector_info {
 	int usb_offset;
 	int latest_offset;
