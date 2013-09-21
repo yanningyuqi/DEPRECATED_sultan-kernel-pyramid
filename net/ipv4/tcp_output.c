@@ -245,12 +245,6 @@ void tcp_select_initial_window(int __space, __u32 mss,
 		else
 			*rcv_wnd = min(*rcv_wnd, init_cwnd * mss);
 	}
-	/* Due to CONFIG_LARGE_TCP_INITIAL_BUFFER not work, hard code first.*/
-	*rcv_wnd = 65535;
-#ifdef CONFIG_LARGE_TCP_INITIAL_BUFFER
-	/* Lock the initial TCP window size to 64K*/
-	*rcv_wnd = 65535;
-#endif
 
 	/* Set the clamp no higher than max representable value */
 	(*window_clamp) = min(65535U << (*rcv_wscale), *window_clamp);
@@ -830,12 +824,6 @@ static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb, int clone_it,
 	inet = inet_sk(sk);
 	tp = tcp_sk(sk);
 	tcb = TCP_SKB_CB(skb);
-
-#ifdef CONFIG_HTC_NETWORK_MODIFY
-	if (IS_ERR(tcb) || (!tcb))
-		printk(KERN_ERR "[NET] tcb is NULL in %s!\n", __func__);
-#endif
-
 	memset(&opts, 0, sizeof(opts));
 
 	if (unlikely(tcb->flags & TCPHDR_SYN))
@@ -845,13 +833,11 @@ static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb, int clone_it,
 							   &md5);
 	tcp_header_size = tcp_options_size + sizeof(struct tcphdr);
 
-	if (tcp_packets_in_flight(tp) == 0)
+	if (tcp_packets_in_flight(tp) == 0) {
 		tcp_ca_event(sk, CA_EVENT_TX_START);
-
-	/* if no packet is in qdisc/device queue, then allow XPS to select
-	 * another queue.
-	 */
-	skb->ooo_okay = sk_wmem_alloc_get(sk) == 0;
+		skb->ooo_okay = 1;
+	} else
+		skb->ooo_okay = 0;
 
 	skb_push(skb, tcp_header_size);
 	skb_reset_transport_header(skb);
@@ -1814,13 +1800,11 @@ static int tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 		tcp_event_new_data_sent(sk, skb);
 
 		tcp_minshall_update(tp, mss_now, skb);
-		sent_pkts += tcp_skb_pcount(skb);
+		sent_pkts++;
 
 		if (push_one)
 			break;
 	}
-	if (inet_csk(sk)->icsk_ca_state == TCP_CA_Recovery)
-		tp->prr_out += sent_pkts;
 
 	if (likely(sent_pkts)) {
 		tcp_cwnd_validate(sk);
@@ -2257,11 +2241,6 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 		last_lost = tp->snd_una;
 	}
 
-#ifdef CONFIG_HTC_NETWORK_MODIFY
-	if (IS_ERR(skb) || (!skb))
-		printk(KERN_ERR "[NET] nat is NULL in %s!\n", __func__);
-#endif
-
 	tcp_for_write_queue_from(skb, sk) {
 		__u8 sacked = TCP_SKB_CB(skb)->sacked;
 
@@ -2318,9 +2297,6 @@ begin_fwd:
 		if (tcp_retransmit_skb(sk, skb))
 			return;
 		NET_INC_STATS_BH(sock_net(sk), mib_idx);
-
-		if (inet_csk(sk)->icsk_ca_state == TCP_CA_Recovery)
-			tp->prr_out += tcp_skb_pcount(skb);
 
 		if (skb == tcp_write_queue_head(sk))
 			inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS,

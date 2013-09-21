@@ -137,6 +137,8 @@ static int esp_output(struct xfrm_state *x, struct sk_buff *skb)
 
 	/* skb is pure payload to encrypt */
 
+	err = -ENOMEM;
+
 	esp = x->data;
 	aead = esp->aead;
 	alen = crypto_aead_authsize(aead);
@@ -172,10 +174,8 @@ static int esp_output(struct xfrm_state *x, struct sk_buff *skb)
 	}
 
 	tmp = esp_alloc_tmp(aead, nfrags + sglists, seqhilen);
-	if (!tmp) {
-		err = -ENOMEM;
+	if (!tmp)
 		goto error;
-	}
 
 	seqhi = esp_tmp_seqhi(tmp);
 	iv = esp_tmp_iv(aead, tmp, seqhilen);
@@ -593,13 +593,6 @@ static int esp_init_authenc(struct xfrm_state *x)
 
 		aalg_desc = xfrm_aalg_get_byname(x->aalg->alg_name, 0);
 		BUG_ON(!aalg_desc);
-
-#ifdef CONFIG_HTC_NETWORK_MODIFY
-		if (IS_ERR(aalg_desc) || (!aalg_desc)) {
-			printk(KERN_ERR "[NET] aalg_desc is NULL in %s!\n", __func__);
-			goto free_key;
-		}
-#endif
 
 		err = -EINVAL;
 		if (aalg_desc->uinfo.auth.icv_fullbits/8 !=
