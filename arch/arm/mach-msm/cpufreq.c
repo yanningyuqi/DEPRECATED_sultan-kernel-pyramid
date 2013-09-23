@@ -58,7 +58,7 @@ static int override_cpu;
  */
 
 /* to be safe, fill vars with defaults */
-uint32_t cmdline_maxkhz = 1566000, cmdline_minkhz = 192000;
+uint32_t cmdline_maxkhz = 1566000, cmdline_minkhz = 384000;
 #ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE
 char cmdline_gov[16] = "performance";
 #endif
@@ -87,7 +87,7 @@ char cmdline_gov[16] = "lazy";
 char cmdline_gov[16] = "badass";
 #endif
 
-uint32_t cmdline_maxscroff = 486000;
+uint32_t cmdline_maxscroff = 594000;
 bool cmdline_scroff = false;
 
 /* only override the governor 2 times, when
