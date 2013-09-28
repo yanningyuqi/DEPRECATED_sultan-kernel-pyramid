@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2011, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -116,7 +116,9 @@ static inline struct device *msm_iommu_get_ctx(const char *ctx_name)
 }
 #endif
 
-static inline int msm_soc_version_supports_iommu_v1(void)
+#endif
+
+static inline int msm_soc_version_supports_iommu(void)
 {
 	if (cpu_is_msm8960() &&
 	    SOCINFO_VERSION_MAJOR(socinfo_get_version()) < 2)
@@ -129,5 +131,3 @@ static inline int msm_soc_version_supports_iommu_v1(void)
 	}
 	return 1;
 }
-
-#endif
