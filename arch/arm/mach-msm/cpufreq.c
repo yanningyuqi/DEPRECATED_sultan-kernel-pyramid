@@ -87,7 +87,7 @@ char cmdline_gov[16] = "lazy";
 char cmdline_gov[16] = "badass";
 #endif
 
-uint32_t cmdline_maxscroff = 594000;
+uint32_t cmdline_maxscroff = 540000;
 bool cmdline_scroff = false;
 
 /* only override the governor 2 times, when
