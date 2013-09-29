@@ -1314,8 +1314,12 @@ void adreno_print_fault_ib(struct kgsl_device *device)
 
 	unsigned int ib_sz;
 
+#ifdef CONFIG_DEBUG_FS
 	if (!device->page_fault_ptbase ||
 		!is_adreno_ib_dump_on_pagef_enabled(device))
+#else
+	if (!device->page_fault_ptbase)
+#endif
 		goto done;
 
 	ib_sz = find_faulting_ib1_size(&adreno_dev->ringbuffer,
