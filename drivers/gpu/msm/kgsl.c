@@ -25,6 +25,7 @@
 #include <linux/rbtree.h>
 #include <linux/ashmem.h>
 #include <linux/major.h>
+#include <linux/highmem.h>
 #include <linux/msm_ion.h>
 #include <linux/io.h>
 #include <mach/socinfo.h>
