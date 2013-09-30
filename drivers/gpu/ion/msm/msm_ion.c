@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,15 +10,23 @@
  * GNU General Public License for more details.
  *
  */
+
+#include <linux/export.h>
 #include <linux/err.h>
 #include <linux/ion.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/memory_alloc.h>
 #include <linux/fmem.h>
+#include <linux/mm.h>
+#include <linux/mm_types.h>
+#include <linux/sched.h>
+#include <linux/rwsem.h>
+#include <linux/uaccess.h>
 #include <mach/ion.h>
 #include <mach/msm_memtypes.h>
 #include "../ion_priv.h"
+#include "ion_cp_common.h"
 
 static struct ion_device *idev;
 static int num_heaps;
@@ -33,15 +41,27 @@ EXPORT_SYMBOL(msm_ion_client_create);
 
 int msm_ion_secure_heap(int heap_id)
 {
-	return ion_secure_heap(idev, heap_id);
+	return ion_secure_heap(idev, heap_id, ION_CP_V1, NULL);
 }
 EXPORT_SYMBOL(msm_ion_secure_heap);
 
 int msm_ion_unsecure_heap(int heap_id)
 {
-	return ion_unsecure_heap(idev, heap_id);
+	return ion_unsecure_heap(idev, heap_id, ION_CP_V1, NULL);
 }
 EXPORT_SYMBOL(msm_ion_unsecure_heap);
+
+int msm_ion_secure_heap_2_0(int heap_id, enum cp_mem_usage usage)
+{
+	return ion_secure_heap(idev, heap_id, ION_CP_V2, (void *)usage);
+}
+EXPORT_SYMBOL(msm_ion_secure_heap_2_0);
+
+int msm_ion_unsecure_heap_2_0(int heap_id, enum cp_mem_usage usage)
+{
+	return ion_unsecure_heap(idev, heap_id, ION_CP_V2, (void *)usage);
+}
+EXPORT_SYMBOL(msm_ion_unsecure_heap_2_0);
 
 int msm_ion_do_cache_op(struct ion_client *client, struct ion_handle *handle,
 			void *vaddr, unsigned long len, unsigned int cmd)
@@ -136,9 +156,11 @@ static void allocate_co_memory(struct ion_platform_heap *heap,
 				}
 
 				cp_data->virt_addr = fmem_info->virt;
-				cp_data->secure_base = heap->base;
-				cp_data->secure_size =
+				if (!cp_data->secure_base) {
+					cp_data->secure_base = heap->base;
+					cp_data->secure_size =
 						heap->size + shared_heap->size;
+				}
 			} else if (!heap->base) {
 				ion_set_base_address(heap, shared_heap,
 					co_heap_data, cp_data);
@@ -147,15 +169,6 @@ static void allocate_co_memory(struct ion_platform_heap *heap,
 	}
 }
 
-/* Fixup heaps in board file to support two heaps being adjacent to each other.
- * A flag (adjacent_mem_id) in the platform data tells us that the heap phy
- * memory location must be adjacent to the specified heap. We do this by
- * carving out memory for both heaps and then splitting up the memory to the
- * two heaps. The heap specifying the "adjacent_mem_id" get the base of the
- * memory while heap specified in "adjacent_mem_id" get base+size as its
- * base address.
- * Note: Modifies platform data and allocates memory.
- */
 static void msm_ion_heap_fixup(struct ion_platform_heap heap_data[],
 			       unsigned int nr_heaps)
 {
@@ -213,6 +226,141 @@ static void msm_ion_allocate(struct ion_platform_heap *heap)
 	}
 }
 
+static int is_heap_overlapping(const struct ion_platform_heap *heap1,
+				const struct ion_platform_heap *heap2)
+{
+	unsigned long heap1_base = heap1->base;
+	unsigned long heap2_base = heap2->base;
+	unsigned long heap1_end = heap1->base + heap1->size - 1;
+	unsigned long heap2_end = heap2->base + heap2->size - 1;
+
+	if (heap1_base == heap2_base)
+		return 1;
+	if (heap1_base < heap2_base && heap1_end >= heap2_base)
+		return 1;
+	if (heap2_base < heap1_base && heap2_end >= heap1_base)
+		return 1;
+	return 0;
+}
+
+static void check_for_heap_overlap(const struct ion_platform_heap heap_list[],
+				   unsigned long nheaps)
+{
+	unsigned long i;
+	unsigned long j;
+
+	for (i = 0; i < nheaps; ++i) {
+		const struct ion_platform_heap *heap1 = &heap_list[i];
+		if (!heap1->base)
+			continue;
+		for (j = i + 1; j < nheaps; ++j) {
+			const struct ion_platform_heap *heap2 = &heap_list[j];
+			if (!heap2->base)
+				continue;
+			if (is_heap_overlapping(heap1, heap2)) {
+				panic("Memory in heap %s overlaps with heap %s\n",
+					heap1->name, heap2->name);
+			}
+		}
+	}
+}
+
+static int check_vaddr_bounds(unsigned long start, unsigned long end)
+{
+	struct mm_struct *mm = current->active_mm;
+	struct vm_area_struct *vma;
+	int ret = 1;
+
+	if (end < start)
+		goto out;
+
+	down_read(&mm->mmap_sem);
+	vma = find_vma(mm, start);
+	if (vma && vma->vm_start < end) {
+		if (start < vma->vm_start)
+			goto out_up;
+		if (end > vma->vm_end)
+			goto out_up;
+		ret = 0;
+	}
+
+out_up:
+	up_read(&mm->mmap_sem);
+out:
+	return ret;
+}
+
+static long msm_ion_custom_ioctl(struct ion_client *client,
+				unsigned int cmd,
+				unsigned long arg)
+{
+	switch (cmd) {
+	case ION_IOC_CLEAN_CACHES:
+	case ION_IOC_INV_CACHES:
+	case ION_IOC_CLEAN_INV_CACHES:
+	{
+		struct ion_flush_data data;
+		unsigned long start, end;
+		struct ion_handle *handle = NULL;
+		int ret;
+
+		if (copy_from_user(&data, (void __user *)arg,
+					sizeof(struct ion_flush_data)))
+			return -EFAULT;
+
+		start = (unsigned long) data.vaddr;
+		end = (unsigned long) data.vaddr + data.length;
+
+		if (check_vaddr_bounds(start, end)) {
+			pr_err("%s: virtual address %p is out of bounds\n",
+				__func__, data.vaddr);
+			return -EINVAL;
+		}
+
+		if (!data.handle) {
+			handle = ion_import_dma_buf(client, data.fd);
+			if (IS_ERR(handle)) {
+				pr_info("%s: Could not import handle: %d\n",
+					__func__, (int)handle);
+				return -EINVAL;
+			}
+		}
+
+		ret = ion_do_cache_op(client,
+				data.handle ? data.handle : handle,
+				data.vaddr, data.offset, data.length,
+				cmd);
+
+		if (!data.handle)
+			ion_free(client, handle);
+
+		if (ret < 0)
+			return ret;
+		break;
+
+	}
+	case ION_IOC_GET_FLAGS:
+	{
+		struct ion_flag_data data;
+		int ret;
+		if (copy_from_user(&data, (void __user *)arg,
+					sizeof(struct ion_flag_data)))
+			return -EFAULT;
+
+		ret = ion_handle_get_flags(client, data.handle, &data.flags);
+		if (ret < 0)
+			return ret;
+		if (copy_to_user((void __user *)arg, &data,
+					sizeof(struct ion_flag_data)))
+			return -EFAULT;
+		break;
+	}
+	default:
+		return -ENOTTY;
+	}
+	return 0;
+}
+
 static int msm_ion_probe(struct platform_device *pdev)
 {
 	struct ion_platform_data *pdata = pdev->dev.platform_data;
@@ -228,7 +376,7 @@ static int msm_ion_probe(struct platform_device *pdev)
 		goto out;
 	}
 
-	idev = ion_device_create(NULL);
+	idev = ion_device_create(msm_ion_custom_ioctl);
 	if (IS_ERR_OR_NULL(idev)) {
 		err = PTR_ERR(idev);
 		goto freeheaps;
@@ -236,7 +384,7 @@ static int msm_ion_probe(struct platform_device *pdev)
 
 	msm_ion_heap_fixup(pdata->heaps, num_heaps);
 
-	/* create the heaps as specified in the board file */
+	
 	for (i = 0; i < num_heaps; i++) {
 		struct ion_platform_heap *heap_data = &pdata->heaps[i];
 		msm_ion_allocate(heap_data);
@@ -259,6 +407,8 @@ static int msm_ion_probe(struct platform_device *pdev)
 
 		ion_device_add_heap(idev, heaps[i]);
 	}
+
+	check_for_heap_overlap(pdata->heaps, num_heaps);
 	platform_set_drvdata(pdev, idev);
 	return 0;
 
