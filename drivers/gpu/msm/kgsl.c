@@ -644,7 +644,9 @@ kgsl_get_process_private(struct kgsl_device_private *cur_dev_priv)
 	spin_unlock(&kgsl_driver.process_dump_lock);
 
 	kgsl_process_init_sysfs(private);
+#ifdef CONFIG_DEBUG_FS
 	kgsl_process_init_debugfs(private);
+#endif
 
 out:
 	mutex_unlock(&kgsl_driver.process_mutex);
