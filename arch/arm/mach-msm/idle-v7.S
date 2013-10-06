@@ -49,12 +49,18 @@ ENTRY(msm_pm_collapse)
 #if (NR_CPUS >= 2)
 	mrc	p15, 0, r1, c0, c0, 5	/* MPIDR */
 	ands	r1, r1, #15		/* What CPU am I */
-	mov     r2, #CPU_SAVED_STATE_SIZE
-	mul     r1, r1, r2
-	add     r0, r0, r1
+	addne	r0, r0, #CPU_SAVED_STATE_SIZE
+#else
+	ldr	r1, =0				/* single cpu, set current cpu to 0. */
+#endif
+	ldr	r2, =cur_cpu
+	str	r1, [r2]			/* store current cpu number for later use. */
+#if defined(CONFIG_THUMB2_KERNEL)
+	stmia   r0!, {r4-r11}
+#else
+	stmia   r0!, {r4-r14}
 #endif
 
-	stmia   r0!, {r4-r14}
 	mrc     p15, 0, r1, c1, c0, 0 /* MMU control */
 	mrc     p15, 0, r2, c2, c0, 0 /* TTBR0 */
 	mrc     p15, 0, r3, c3, c0, 0 /* dacr */
@@ -84,8 +90,11 @@ ENTRY(msm_pm_collapse)
 	stmia   r0!, {r1-r3}
 #endif
 
-#ifdef CONFIG_MSM_JTAG
-	bl      msm_jtag_save_state
+#ifdef CONFIG_MSM_DEBUG_ACROSS_PC
+	bl      msm_save_jtag_debug
+#endif
+#ifdef CONFIG_MSM_TRACE_ACROSS_PC
+	bl      etm_save_reg_check
 #endif
 
 	ldr	r0, =msm_pm_flush_l2_flag
@@ -100,7 +109,7 @@ ENTRY(msm_pm_collapse)
 	cmp	r1, #1
 	bne	skip
 	bl	v7_flush_dcache_all
-	b       skip2
+	b skip2
 
 skip:	ldr	r0, =saved_state
 	ldr	r1, =saved_state_end
@@ -131,19 +140,23 @@ skip2:
 #if defined(CONFIG_MSM_FIQ_SUPPORT)
 	cpsie   f
 #endif
-#ifdef CONFIG_MSM_JTAG
-	bl	msm_jtag_restore_state
+#ifdef CONFIG_MSM_TRACE_ACROSS_PC
+	bl	etm_restore_reg_check
+#endif
+#ifdef CONFIG_MSM_DEBUG_ACROSS_PC
+	bl	msm_restore_jtag_debug
 #endif
 	ldr     r0, =saved_state        /* restore registers */
 #if (NR_CPUS >= 2)
 	mrc	p15, 0, r1, c0, c0, 5	/* MPIDR */
 	ands	r1, r1, #15		/* What CPU am I */
-	mov     r2, #CPU_SAVED_STATE_SIZE
-	mul     r2, r2, r1
-	add     r0, r0, r2
+	addne	r0, r0, #CPU_SAVED_STATE_SIZE
 #endif
-
+#if defined(CONFIG_THUMB2_KERNEL)
+	ldmfd   r0, {r4-r11}
+#else
 	ldmfd   r0, {r4-r14}
+#endif
 	mov     r0, #0                   /* return power collapse failed */
 	bx      lr
 
@@ -157,18 +170,21 @@ ENTRY(msm_pm_collapse_exit)
 	mov     r1, #'A'
 	str     r1, [r0, #0x00C]
 #endif
-	ldr     r1, =saved_state
+#ifdef CONFIG_ARCH_MSM7X30
+	bl	__cpu_early_init
+
+.globl _cpu_early_init_complete
+_cpu_early_init_complete:
+#endif
+	ldr     r1, =saved_state_end
 	ldr     r2, =msm_pm_collapse_exit
 	adr     r3, msm_pm_collapse_exit
 	add     r1, r1, r3
 	sub     r1, r1, r2
-	add     r1, r1, #CPU_SAVED_STATE_SIZE
 #if (NR_CPUS >= 2)
 	mrc	p15, 0, r2, c0, c0, 5	/* MPIDR */
 	ands	r2, r2, #15		/* What CPU am I */
-	mov     r3, #CPU_SAVED_STATE_SIZE
-	mul     r2, r2, r3
-	add     r1, r1, r2
+	subeq	r1, r1, #CPU_SAVED_STATE_SIZE
 #endif
 
 #ifdef CONFIG_MSM_CPU_AVS
@@ -193,7 +209,11 @@ ENTRY(msm_pm_collapse_exit)
 	mcr     p15, 0, r10, c13, c0, 3 /* TPIDRURO */
 	mcr     p15, 0, r11, c13, c0, 1 /* context ID */
 	isb
+#if defined(CONFIG_THUMB2_KERNEL)
+	ldmdb   r1!, {r4-r11}
+#else
 	ldmdb   r1!, {r4-r14}
+#endif
 	ldr	r0, =msm_pm_pc_pgd
 	ldr	r1, =msm_pm_collapse_exit
 	adr	r3, msm_pm_collapse_exit
@@ -217,12 +237,17 @@ msm_pm_pa_to_va:
 	mcr     p15, 0, r3, c8, c7, 0   /* UTLBIALL */
 	mcr     p15, 0, r3, c7, c5, 6   /* BPIALL */
 	dsb
+
 	isb
-#ifdef CONFIG_MSM_JTAG
 	stmfd   sp!, {lr}
-	bl      msm_jtag_restore_state
-	ldmfd   sp!, {lr}
+	bl      v7_flush_kern_cache_all
+#ifdef CONFIG_MSM_TRACE_ACROSS_PC
+	bl      etm_restore_reg_check
 #endif
+#ifdef CONFIG_MSM_DEBUG_ACROSS_PC
+	bl      msm_restore_jtag_debug
+#endif
+	ldmfd   sp!, {lr}
 	mov     r0, #1
 	bx      lr
 	nop
@@ -268,9 +293,15 @@ msm_pm_pc_pgd:
 	.long	0x0
 
 saved_state:
-	.space  CPU_SAVED_STATE_SIZE * NR_CPUS
+#if (NR_CPUS >= 2)
+	.space	CPU_SAVED_STATE_SIZE * 2 /* This code only supports 2 cores */
+#else
+	.space	CPU_SAVED_STATE_SIZE
+#endif
 saved_state_end:
 
+cur_cpu:
+	.space	4 /* store current cpu number */
 msm_pm_boot_vector:
 	.space  4 * NR_CPUS
 
