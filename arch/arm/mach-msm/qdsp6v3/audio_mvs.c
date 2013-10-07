@@ -116,7 +116,6 @@ static void audio_mvs_process_ul_pkt(uint8_t *voc_pkt,
 			 * Bits 4-7: Frame type
 			 */
 			buf_node->frame.frame_type = ((*voc_pkt) & 0xF0) >> 4;
-			buf_node->frame.frame_rate = ((*voc_pkt) & 0x0F);
 			voc_pkt = voc_pkt + DSP_FRAME_HDR_LEN;
 
 			buf_node->frame.len = pkt_len - DSP_FRAME_HDR_LEN;
@@ -520,6 +519,10 @@ static uint32_t audio_mvs_get_media_type(uint32_t mvs_mode, uint32_t rate_type)
 			media_type = VSS_MEDIA_ID_G711_ALAW;
 		break;
 
+	case MVS_MODE_PCM_WB:
+		media_type = VSS_MEDIA_ID_PCM_WB;
+		break;
+
 	default:
 		media_type = VSS_MEDIA_ID_PCM_NB;
 	}
@@ -544,6 +547,7 @@ static uint32_t audio_mvs_get_network_type(uint32_t mvs_mode)
 		break;
 
 	case MVS_MODE_AMR_WB:
+	case MVS_MODE_PCM_WB:
 		network_type = VSS_NETWORK_ID_VOIP_WB;
 		break;
 
