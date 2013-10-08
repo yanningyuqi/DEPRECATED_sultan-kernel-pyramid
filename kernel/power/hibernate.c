@@ -624,7 +624,7 @@ int hibernate(void)
 
 	error = usermodehelper_disable();
 	if (error)
-		goto Enable_umh;
+		goto Exit;
 
 	/* Allocate memory management structures */
 	error = create_basic_memory_bitmaps();
