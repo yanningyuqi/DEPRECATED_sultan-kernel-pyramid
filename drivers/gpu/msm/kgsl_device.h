@@ -283,6 +283,7 @@ struct kgsl_context {
  * @stats: Memory allocation statistics for this process
  */
 struct kgsl_process_private {
+	unsigned int refcnt;
 	unsigned long priv;
 	pid_t pid;
 	spinlock_t mem_lock;
