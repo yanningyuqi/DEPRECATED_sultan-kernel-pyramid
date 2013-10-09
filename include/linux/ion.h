@@ -324,6 +324,9 @@ void ion_free(struct ion_client *client, struct ion_handle *handle);
 int ion_phys(struct ion_client *client, struct ion_handle *handle,
 	     ion_phys_addr_t *addr, size_t *len);
 
+struct sg_table *ion_sg_table(struct ion_client *client,
+			      struct ion_handle *handle);
+
 /**
  * ion_map_kernel - create mapping for the given handle
  * @client:	the client
@@ -361,6 +364,8 @@ struct scatterlist *ion_map_dma(struct ion_client *client,
  * @handle:	handle to unmap
  */
 void ion_unmap_dma(struct ion_client *client, struct ion_handle *handle);
+
+struct ion_handle *ion_import_dma_buf(struct ion_client *client, int fd);
 
 /**
  * ion_share() - given a handle, obtain a buffer to pass to other clients
@@ -567,6 +572,12 @@ static inline int ion_phys(struct ion_client *client,
 	return -ENODEV;
 }
 
+static inline struct sg_table *ion_sg_table(struct ion_client *client,
+			      struct ion_handle *handle)
+{
+	return ERR_PTR(-ENODEV);
+}
+
 static inline void *ion_map_kernel(struct ion_client *client,
 	struct ion_handle *handle, unsigned long flags)
 {
@@ -599,6 +610,11 @@ static inline struct ion_handle *ion_import(struct ion_client *client,
 
 static inline struct ion_handle *ion_import_fd(struct ion_client *client,
 	int fd)
+{
+	return ERR_PTR(-ENODEV);
+}
+
+static inline struct ion_handle *ion_import_dma_buf(struct ion_client *client, int fd)
 {
 	return ERR_PTR(-ENODEV);
 }
