@@ -18,13 +18,29 @@
 #include "kgsl_device.h"
 #include "kgsl_sharedmem.h"
 
-/*default log levels is error for everything*/
 #define KGSL_LOG_LEVEL_DEFAULT 3
 #define KGSL_LOG_LEVEL_MAX     7
 
 struct dentry *kgsl_debugfs_dir;
 static struct dentry *pm_d_debugfs;
 struct dentry *proc_d_debugfs;
+
+#ifdef CONFIG_MSM_KGSL_GPU_USAGE
+
+static int ctx_dump_set(void* data, u64 val)
+{
+	struct kgsl_device *device = data;
+
+	mutex_lock(&device->mutex);
+	kgsl_dump_contextpid(&device->context_idr);
+	mutex_unlock(&device->mutex);
+	return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(ctx_dump_fops,
+			NULL,
+			ctx_dump_set, "%llu\n");
+#endif
 
 static int pm_dump_set(void *data, u64 val)
 {
@@ -153,8 +169,11 @@ void kgsl_device_debugfs_init(struct kgsl_device *device)
 				&pwr_log_fops);
 	debugfs_create_file("log_level_ft", 0644, device->d_debugfs, device,
 				&ft_log_fops);
-
-	/* Create postmortem dump control files */
+#ifdef CONFIG_MSM_KGSL_GPU_USAGE
+	debugfs_create_file("contexpid_dump",  0644, device->d_debugfs, device,
+				&ctx_dump_fops);
+#endif
+	
 
 	pm_d_debugfs = debugfs_create_dir("postmortem", device->d_debugfs);
 
@@ -215,7 +234,7 @@ static int process_mem_print(struct seq_file *s, void *unused)
 		entry = rb_entry(node, struct kgsl_mem_entry, node);
 		m = &entry->memdesc;
 
-		flags[0] = kgsl_memdesc_is_global(m) ?  'g' : '-';
+		flags[0] = m->priv & KGSL_MEMDESC_GLOBAL ?  'g' : '-';
 		flags[1] = m->flags & KGSL_MEMFLAGS_GPUREADONLY ? 'r' : '-';
 		flags[2] = get_alignflag(m);
 		flags[3] = '\0';
