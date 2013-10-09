@@ -86,30 +86,25 @@
 /* SMI PMEM Region, as the video core will use offset address */
 /* from the Firmware base */
 #define KERNEL_SMI_BASE       (MSM_SMI_BASE)
-#define KERNEL_SMI_SIZE       0x400000
+#define KERNEL_SMI_SIZE       0x500000
 
 #define MSM_SMI_BASE          (0x38000000)
 #ifdef CONFIG_PYRAMID_624MB_RAM
-#define MSM_SMI_SIZE          (0x2C80000)
-
-/* User space SMI PMEM Region for video core*/
-/* used for encoder, decoder input & output buffers  */
-#define USER_SMI_BASE         (KERNEL_SMI_BASE + KERNEL_SMI_SIZE)
-#define USER_SMI_SIZE         (0x2700000)
+#define MSM_SMI_SIZE          (0x4000000 - MSM_PMEM_ADSP_SIZE)
 #else
 #define MSM_SMI_SIZE          (0x4000000)
+#endif /*CONFIG_PYRAMID_624MB_RAM*/
 
 /* User space SMI PMEM Region for video core*/
 /* used for encoder, decoder input & output buffers  */
 #define USER_SMI_BASE         (KERNEL_SMI_BASE + KERNEL_SMI_SIZE)
 #define USER_SMI_SIZE         (MSM_SMI_SIZE - KERNEL_SMI_SIZE)
-#endif /*CONFIG_PYRAMID_624MB_RAM*/
 #define MSM_PMEM_SMIPOOL_BASE USER_SMI_BASE
 #define MSM_PMEM_SMIPOOL_SIZE USER_SMI_SIZE
 
 #define PHY_BASE_ADDR1  0x48000000
 #ifdef CONFIG_PYRAMID_624MB_RAM
-#define SIZE_ADDR1      0x27F36000
+#define SIZE_ADDR1      0x27F00000
 #else
 #define SIZE_ADDR1      (MSM_PMEM_ADSP_BASE - PHY_BASE_ADDR1)
 #endif /*CONFIG_PYRAMID_624MB_RAM*/

@@ -3448,9 +3448,6 @@ static struct memtype_reserve msm8x60_reserve_table[] __initdata = {
 	[MEMTYPE_EBI0] = {
 		.flags	=	MEMTYPE_FLAGS_1M_ALIGN,
 	},
-	[MEMTYPE_EBI1] = {
-		.flags	=	MEMTYPE_FLAGS_FIXED,
-	},
 };
 
 #ifdef CONFIG_ANDROID_PMEM
