@@ -1,6 +1,8 @@
-/* linux/arch/arm/mach-msm/board-spade.h
+/* linux/arch/arm/mach-msm/board-pyramid.h
  *
  * Copyright (C) 2010-2011 HTC Corporation.
+ *
+ * 2013 - Memory remapped by Sultanxda (android1234567)
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -34,15 +36,15 @@
 
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MSM_FB_PRIM_BUF_SIZE \
-		0x5F1000 /* 4 bpp x 3 pages */ /*(roundup((960 * 540 * 4), 4096) * 3)*/
+		(roundup((960 * 540 * 4), 4096) * 3) /* 4 bpp x 3 pages */ /*0x5F1000*/
 #else
 #define MSM_FB_PRIM_BUF_SIZE \
-		0x3F6000 /* 4 bpp x 2 pages */ /*(roundup((960 * 540 * 4), 4096) * 2)*/
+		(roundup((960 * 540 * 4), 4096) * 2) /* 4 bpp x 2 pages */ /*0x3F6000*/
 #endif
 
 #ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
 #define MSM_FB_EXT_BUF_SIZE  \
-		0x3F5000 /* 2 bpp x 1 page */ /*(roundup((1920 * 1080 * 2), 4096) * 1)*/
+		(roundup((1920 * 1080 * 2), 4096) * 1) /* 2 bpp x 1 page */ /*0x3F5000*/
 #else
 #define MSM_FB_EXT_BUF_SIZE	0
 #endif
@@ -57,28 +59,24 @@
 #endif
 
 /* Note: must be multiple of 4096 */
-#define MSM_FB_SIZE 0x6F0000 /*roundup(MSM_FB_PRIM_BUF_SIZE + MSM_FB_EXT_BUF_SIZE, 4096)*/
+#define MSM_FB_SIZE 0x9E6000
 
-#define MSM_PMEM_MDP_SIZE	0x23A0000
-#ifdef CONFIG_PYRAMID_624MB_RAM
+#define MSM_PMEM_MDP_SIZE	0x2A90000
 #define MSM_PMEM_ADSP_SIZE	0x1500000
-#else
-#define MSM_PMEM_ADSP_SIZE	0x1CB0000
-#endif /*CONFIG_PYRAMID_624MB_RAM*/
 #define MSM_PMEM_AUDIO_SIZE	0x239000
 
 #ifdef CONFIG_FB_MSM_OVERLAY_WRITEBACK
 #define MSM_FB_WRITEBACK_BASE	(0x45C00000)
 #endif
 
-#define MSM_FB_BASE		(MSM_PMEM_MDP_BASE + MSM_PMEM_MDP_SIZE)
+#define MSM_FB_BASE		(0x70000000 - MSM_FB_SIZE)
 #define MSM_PMEM_MDP_BASE	(0x40400000)
 #define MSM_PMEM_AUDIO_BASE	(0x46400000)
-#ifdef CONFIG_PYRAMID_624MB_RAM
+#ifdef CONFIG_PYRAMID_MORE_RAM
 #define MSM_PMEM_ADSP_BASE	(USER_SMI_BASE + USER_SMI_SIZE)
 #else
-#define MSM_PMEM_ADSP_BASE	(0x70000000 - MSM_PMEM_ADSP_SIZE)
-#endif /*CONFIG_PYRAMID_624MB_RAM*/
+#define MSM_PMEM_ADSP_BASE	(0x6F600000 - MSM_PMEM_ADSP_SIZE)
+#endif /*CONFIG_PYRAMID_MORE_RAM*/
 
 /* Kernel SMI PMEM Region for video core, used for Firmware */
 /* and encoder,decoder scratch buffers */
@@ -89,11 +87,11 @@
 #define KERNEL_SMI_SIZE       0x500000
 
 #define MSM_SMI_BASE          (0x38000000)
-#ifdef CONFIG_PYRAMID_624MB_RAM
+#ifdef CONFIG_PYRAMID_MORE_RAM
 #define MSM_SMI_SIZE          (0x4000000 - MSM_PMEM_ADSP_SIZE)
 #else
 #define MSM_SMI_SIZE          (0x4000000)
-#endif /*CONFIG_PYRAMID_624MB_RAM*/
+#endif /*CONFIG_PYRAMID_MORE_RAM*/
 
 /* User space SMI PMEM Region for video core*/
 /* used for encoder, decoder input & output buffers  */
@@ -103,11 +101,11 @@
 #define MSM_PMEM_SMIPOOL_SIZE USER_SMI_SIZE
 
 #define PHY_BASE_ADDR1  0x48000000
-#ifdef CONFIG_PYRAMID_624MB_RAM
-#define SIZE_ADDR1      0x27F00000
+#ifdef CONFIG_PYRAMID_MORE_RAM
+#define SIZE_ADDR1      0x27600000
 #else
 #define SIZE_ADDR1      (MSM_PMEM_ADSP_BASE - PHY_BASE_ADDR1)
-#endif /*CONFIG_PYRAMID_624MB_RAM*/
+#endif /*CONFIG_PYRAMID_MORE_RAM*/
 
 /* GPIO definition */
 
