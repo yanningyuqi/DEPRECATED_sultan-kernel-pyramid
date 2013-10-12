@@ -29,7 +29,7 @@
 #include <linux/fmem.h>
 #include <linux/iommu.h>
 
-#include <asm/mach/map.h>
+#include <asm/mach/map_ion.h>
 
 #include <mach/msm_memtypes.h>
 #include <mach/scm.h>
@@ -37,7 +37,6 @@
 
 #include "ion_priv.h"
 
-#include <asm/mach/map.h>
 #include <asm/cacheflush.h>
 
 #include "msm/ion_cp_common.h"
@@ -384,7 +383,6 @@ void *ion_map_fmem_buffer(struct ion_buffer *buffer, unsigned long phys_base,
 	if (phys_base > buffer->priv_phys)
 		return NULL;
 
-
 	ret = ioremap_pages(start, buffer->priv_phys, buffer->size, type);
 
 	if (!ret)
@@ -444,8 +442,11 @@ void ion_cp_heap_unmap_kernel(struct ion_heap *heap,
 	if (cp_heap->reusable)
 		unmap_kernel_range((unsigned long)buffer->vaddr, buffer->size);
 	else
+#ifdef CONFIG_KGSL_COMPAT
+		__iounmap(buffer->vaddr);
+#else
 		__arm_iounmap(buffer->vaddr);
-
+#endif
 	buffer->vaddr = NULL;
 
 	mutex_lock(&cp_heap->lock);

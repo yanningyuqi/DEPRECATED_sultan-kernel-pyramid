@@ -198,7 +198,11 @@ void ion_carveout_heap_unmap_kernel(struct ion_heap *heap,
 	struct ion_carveout_heap *carveout_heap =
 		container_of(heap, struct ion_carveout_heap, heap);
 
+#ifdef CONFIG_KGSL_COMPAT
+	__iounmap(buffer->vaddr);
+#else
 	__arm_iounmap(buffer->vaddr);
+#endif
 	buffer->vaddr = NULL;
 
 	ion_carveout_release_region(carveout_heap);

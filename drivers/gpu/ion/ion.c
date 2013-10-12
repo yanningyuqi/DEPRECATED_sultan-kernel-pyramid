@@ -33,7 +33,11 @@
 #include <linux/uaccess.h>
 #include <linux/debugfs.h>
 #include <linux/dma-buf.h>
+#ifdef CONFIG_KGSL_COMPAT
+#include <linux/ion.h>
+#else
 #include <linux/msm_ion.h>
+#endif
 
 #include <mach/iommu_domains.h>
 #include "ion_priv.h"
