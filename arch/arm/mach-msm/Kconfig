@@ -1515,14 +1515,6 @@ config CMDLINE_OPTIONS
 	  maxscroff=<VALUEinKHZ> commands from the kernels cmdline.
 	  This also enables a freq. cap while the screen is off.
 
-config MSM_MPDEC
-	bool "Enable kernel based mpdecision"
-	depends on MSM_SMP
-	default n
-	help
-	  This enables kernel based multi core control.
-	  (up/down hotplug based on load)
-
 if CPU_FREQ_MSM
 
 config MSM_CPU_FREQ_SET_MIN_MAX
@@ -1535,12 +1527,12 @@ config MSM_CPU_FREQ_SET_MIN_MAX
 config MSM_CPU_FREQ_MAX
 	int "Max CPU Frequency"
 	depends on MSM_CPU_FREQ_SET_MIN_MAX
-	default 384000
+	default 1512000
 
 config MSM_CPU_FREQ_MIN
 	int "Min CPU Frequency"
 	depends on MSM_CPU_FREQ_SET_MIN_MAX
-	default 245760
+	default 384000
 
 endif # CPU_FREQ_MSM
 
