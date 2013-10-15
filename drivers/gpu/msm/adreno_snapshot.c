@@ -17,7 +17,6 @@
 #include "adreno.h"
 #include "adreno_pm4types.h"
 #include "a2xx_reg.h"
-#include "a3xx_reg.h"
 
 #define NUM_DWORDS_OF_RINGBUFFER_HISTORY 100
 
@@ -339,65 +338,9 @@ static int ib_parse_type3(struct kgsl_device *device, unsigned int *ptr,
 	return 0;
 }
 
-/*
- * Parse type0 packets found in the stream.  Some of the registers that are
- * written are clues for GPU buffers that we need to freeze.  Register writes
- * are considred valid when a draw initator is called, so just cache the values
- * here and freeze them when a CP_DRAW_INDX is seen.  This protects against
- * needlessly caching buffers that won't be used during a draw call
- */
-
 static void ib_parse_type0(struct kgsl_device *device, unsigned int *ptr,
 	unsigned int ptbase)
 {
-	int size = type0_pkt_size(*ptr);
-	int offset = type0_pkt_offset(*ptr);
-	int i;
-
-	for (i = 0; i < size; i++, offset++) {
-
-		
-
-		if (offset >= A3XX_VSC_PIPE_DATA_ADDRESS_0 &&
-			offset <= A3XX_VSC_PIPE_DATA_LENGTH_7) {
-			int index = offset - A3XX_VSC_PIPE_DATA_ADDRESS_0;
-
-
-			if ((index % 3) == 0)
-				vsc_pipe[index / 3].base = ptr[i + 1];
-			else if ((index % 3) == 1)
-				vsc_pipe[index / 3].size = ptr[i + 1];
-		} else if ((offset >= A3XX_VFD_FETCH_INSTR_0_0) &&
-			(offset <= A3XX_VFD_FETCH_INSTR_1_F)) {
-			int index = offset - A3XX_VFD_FETCH_INSTR_0_0;
-
-
-			if ((index % 2) == 0)
-				vbo[index >> 1].stride =
-					(ptr[i + 1] >> 7) & 0x1FF;
-			else
-				vbo[index >> 1].base = ptr[i + 1];
-		} else {
-
-			switch (offset) {
-			case A3XX_VFD_CONTROL_0:
-				vfd_control_0 = ptr[i + 1];
-				break;
-			case A3XX_VFD_INDEX_MAX:
-				vfd_index_max = ptr[i + 1];
-				break;
-			case A3XX_VSC_SIZE_ADDRESS:
-				vsc_size_address = ptr[i + 1];
-				break;
-			case A3XX_SP_VS_PVT_MEM_ADDR_REG:
-				sp_vs_pvt_mem_addr = ptr[i + 1];
-				break;
-			case A3XX_SP_FS_PVT_MEM_ADDR_REG:
-				sp_fs_pvt_mem_addr = ptr[i + 1];
-				break;
-			}
-		}
-	}
 }
 
 
