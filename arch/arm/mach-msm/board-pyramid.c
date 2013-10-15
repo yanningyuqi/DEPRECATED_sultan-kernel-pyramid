@@ -3681,10 +3681,19 @@ static void __init msm8x60_calculate_reserve_sizes(void)
 
 static int msm8x60_paddr_to_memtype(phys_addr_t paddr)
 {
+#ifdef CONFIG_PYRAMID_MORE_RAM
+	if (paddr >= 0x40000000 && paddr <= 0x70000000)
+		return MEMTYPE_EBI1;
+	if (paddr >= 0x39100000 && paddr < 0x40000000)
+		return MEMTYPE_SMI;
+	if (paddr >= 0x38000000 && paddr <= 0x39000000)
+		return MEMTYPE_EBI1;
+#else
 	if (paddr >= 0x40000000 && paddr < 0x70000000)
 		return MEMTYPE_EBI1;
 	if (paddr >= 0x38000000 && paddr < 0x40000000)
 		return MEMTYPE_SMI;
+#endif
 	return MEMTYPE_NONE;
 }
 
