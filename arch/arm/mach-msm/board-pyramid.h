@@ -59,39 +59,22 @@
 #endif
 
 /* Note: must be multiple of 4096 */
-#ifdef CONFIG_PYRAMID_MORE_RAM
 #define MSM_FB_SIZE 0x6F0000
-#else
-#define MSM_FB_SIZE 0x9E6000
-#endif
 
-#ifdef CONFIG_PYRAMID_MORE_RAM
 #define MSM_PMEM_MDP_SIZE	0x22F0000
-#define MSM_PMEM_ADSP_SIZE	0x1000000
-#else
-#define MSM_PMEM_MDP_SIZE	0x2A90000
 #define MSM_PMEM_ADSP_SIZE	0x1500000
-#endif /*CONFIG_PYRAMID_MORE_RAM*/
 #define MSM_PMEM_AUDIO_SIZE	0x239000
 
 #ifdef CONFIG_FB_MSM_OVERLAY_WRITEBACK
 #define MSM_FB_WRITEBACK_BASE	(0x45C00000)
 #endif
 
-#ifdef CONFIG_PYRAMID_MORE_RAM
 #define MSM_FB_BASE		(0x42700000)
-#else
-#define MSM_FB_BASE		(0x70000000 - MSM_FB_SIZE)
-#endif /*CONFIG_PYRAMID_MORE_RAM*/
 
 #define MSM_PMEM_MDP_BASE	(0x40400000)
 #define MSM_PMEM_AUDIO_BASE	(0x46400000)
 
-#ifdef CONFIG_PYRAMID_MORE_RAM
-#define MSM_PMEM_ADSP_BASE	(0x38000000)
-#else
-#define MSM_PMEM_ADSP_BASE	(0x6F600000 - MSM_PMEM_ADSP_SIZE)
-#endif /*CONFIG_PYRAMID_MORE_RAM*/
+#define MSM_PMEM_ADSP_BASE	(0x70000000 - MSM_PMEM_ADSP_SIZE)
 
 /* Kernel SMI PMEM Region for video core, used for Firmware */
 /* and encoder,decoder scratch buffers */
@@ -101,13 +84,8 @@
 #define KERNEL_SMI_BASE       (MSM_SMI_BASE)
 #define KERNEL_SMI_SIZE       0x500000
 
-#ifdef CONFIG_PYRAMID_MORE_RAM
-#define MSM_SMI_BASE          (MSM_PMEM_ADSP_BASE + MSM_PMEM_ADSP_SIZE + 0x100000)
-#define MSM_SMI_SIZE          (0x4000000 - (MSM_PMEM_ADSP_SIZE + 0x100000))
-#else
 #define MSM_SMI_BASE          (0x38000000)
 #define MSM_SMI_SIZE          (0x4000000)
-#endif /*CONFIG_PYRAMID_MORE_RAM*/
 
 /* User space SMI PMEM Region for video core*/
 /* used for encoder, decoder input & output buffers  */
@@ -143,11 +121,11 @@
 #endif
 
 #define PHY_BASE_ADDR1  0x48000000
-#if defined(CONFIG_ION_MSM) || defined(CONFIG_PYRAMID_MORE_RAM)
+#ifdef CONFIG_ION_MSM
 #define SIZE_ADDR1      0x28000000
 #else
 #define SIZE_ADDR1      (MSM_PMEM_ADSP_BASE - PHY_BASE_ADDR1)
-#endif /*CONFIG_PYRAMID_MORE_RAM*/
+#endif
 
 /* GPIO definition */
 

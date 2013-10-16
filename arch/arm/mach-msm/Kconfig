@@ -1203,15 +1203,6 @@ choice
 	    prompt "Package 4"
 endchoice
 
-config PYRAMID_MORE_RAM
-	bool "Allocate more RAM to userspace on the HTC Pyramid"
-	default n
-	help
-	Use a custom memory map for the Pyramid
-	that allocates more RAM to userspace.
-	In exchange for more RAM, you will lose
-	the camera's 1080P video functionality.
-
 config MSM_SMD0_WQ
 	bool "SMD0 TTY Workqueue"
 	depends on (MSM_SMD)
