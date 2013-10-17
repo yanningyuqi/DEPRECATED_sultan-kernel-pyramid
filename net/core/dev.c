@@ -3596,6 +3596,12 @@ struct sk_buff *napi_frags_skb(struct napi_struct *napi)
 	 * This works because the only protocols we care about don't require
 	 * special handling.  We'll fix it up properly at the end.
 	 */
+
+#ifdef CONFIG_HTC_NETWORK_MODIFY
+	if (IS_ERR(eth) || (!eth))
+		printk(KERN_ERR "[CORE] eth is NULL in %s!\n", __func__);
+#endif
+
 	skb->protocol = eth->h_proto;
 
 out:
@@ -5204,6 +5210,7 @@ static void rollback_registered_many(struct list_head *head)
 	/* Process any work delayed until the end of the batch */
 	dev = list_first_entry(head, struct net_device, unreg_list);
 	call_netdevice_notifiers(NETDEV_UNREGISTER_BATCH, dev);
+	rtmsg_ifinfo(RTM_DELLINK, dev, ~0U);
 
 	rcu_barrier();
 
