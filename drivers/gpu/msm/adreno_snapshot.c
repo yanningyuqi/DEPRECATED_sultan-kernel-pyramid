@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -17,7 +17,6 @@
 #include "adreno.h"
 #include "adreno_pm4types.h"
 #include "a2xx_reg.h"
-#include "a3xx_reg.h"
 
 #define NUM_DWORDS_OF_RINGBUFFER_HISTORY 100
 
@@ -113,9 +112,6 @@ static unsigned int vfd_control_0;
 
 static unsigned int sp_vs_pvt_mem_addr;
 static unsigned int sp_fs_pvt_mem_addr;
-
-static unsigned int sp_vs_obj_start_reg;
-static unsigned int sp_fs_obj_start_reg;
 
 
 static int load_state_unit_sizes[7][2] = {
@@ -295,26 +291,6 @@ static int ib_parse_draw_indx(struct kgsl_device *device, unsigned int *pkt,
 		sp_fs_pvt_mem_addr = 0;
 	}
 
-	if (sp_vs_obj_start_reg) {
-		ret = kgsl_snapshot_get_object(device, ptbase,
-			sp_vs_obj_start_reg & 0xFFFFFFE0, 0,
-			SNAPSHOT_GPU_OBJECT_GENERIC);
-		if (ret < 0)
-			return -EINVAL;
-		snapshot_frozen_objsize += ret;
-		sp_vs_obj_start_reg = 0;
-	}
-
-	if (sp_fs_obj_start_reg) {
-		ret = kgsl_snapshot_get_object(device, ptbase,
-			sp_fs_obj_start_reg & 0xFFFFFFE0, 0,
-			SNAPSHOT_GPU_OBJECT_GENERIC);
-		if (ret < 0)
-			return -EINVAL;
-		snapshot_frozen_objsize += ret;
-		sp_fs_obj_start_reg = 0;
-	}
-
 	
 
 	
@@ -362,75 +338,10 @@ static int ib_parse_type3(struct kgsl_device *device, unsigned int *ptr,
 	return 0;
 }
 
-/*
- * Parse type0 packets found in the stream.  Some of the registers that are
- * written are clues for GPU buffers that we need to freeze.  Register writes
- * are considred valid when a draw initator is called, so just cache the values
- * here and freeze them when a CP_DRAW_INDX is seen.  This protects against
- * needlessly caching buffers that won't be used during a draw call
- */
-
 static void ib_parse_type0(struct kgsl_device *device, unsigned int *ptr,
 	unsigned int ptbase)
 {
-	int size = type0_pkt_size(*ptr);
-	int offset = type0_pkt_offset(*ptr);
-	int i;
-
-	for (i = 0; i < size - 1; i++, offset++) {
-
-		
-
-		if (offset >= A3XX_VSC_PIPE_DATA_ADDRESS_0 &&
-			offset <= A3XX_VSC_PIPE_DATA_LENGTH_7) {
-			int index = offset - A3XX_VSC_PIPE_DATA_ADDRESS_0;
-
-
-			if ((index % 3) == 0)
-				vsc_pipe[index / 3].base = ptr[i + 1];
-			else if ((index % 3) == 1)
-				vsc_pipe[index / 3].size = ptr[i + 1];
-		} else if ((offset >= A3XX_VFD_FETCH_INSTR_0_0) &&
-			(offset <= A3XX_VFD_FETCH_INSTR_1_F)) {
-			int index = offset - A3XX_VFD_FETCH_INSTR_0_0;
-
-
-			if ((index % 2) == 0)
-				vbo[index >> 1].stride =
-					(ptr[i + 1] >> 7) & 0x1FF;
-			else
-				vbo[index >> 1].base = ptr[i + 1];
-		} else {
-
-			switch (offset) {
-			case A3XX_VFD_CONTROL_0:
-				vfd_control_0 = ptr[i + 1];
-				break;
-			case A3XX_VFD_INDEX_MAX:
-				vfd_index_max = ptr[i + 1];
-				break;
-			case A3XX_VSC_SIZE_ADDRESS:
-				vsc_size_address = ptr[i + 1];
-				break;
-			case A3XX_SP_VS_PVT_MEM_ADDR_REG:
-				sp_vs_pvt_mem_addr = ptr[i + 1];
-				break;
-			case A3XX_SP_FS_PVT_MEM_ADDR_REG:
-				sp_fs_pvt_mem_addr = ptr[i + 1];
-				break;
-			case A3XX_SP_VS_OBJ_START_REG:
-				sp_vs_obj_start_reg = ptr[i + 1];
-				break;
-			case A3XX_SP_FS_OBJ_START_REG:
-				sp_fs_obj_start_reg = ptr[i + 1];
-				break;
-			}
-		}
-	}
 }
-
-static inline int parse_ib(struct kgsl_device *device, unsigned int ptbase,
-		unsigned int gpuaddr, unsigned int dwords);
 
 
 static int ib_add_gpu_object(struct kgsl_device *device, unsigned int ptbase,
@@ -465,12 +376,23 @@ static int ib_add_gpu_object(struct kgsl_device *device, unsigned int ptbase,
 			if (adreno_cmd_is_ib(src[i])) {
 				unsigned int gpuaddr = src[i + 1];
 				unsigned int size = src[i + 2];
-
-				ret = parse_ib(device, ptbase, gpuaddr, size);
+				unsigned int ibbase;
 
 				
-				if (ret < 0)
-					goto done;
+				kgsl_regread(device, REG_CP_IB2_BASE, &ibbase);
+
+
+				if (ibbase == gpuaddr)
+					push_object(device,
+						SNAPSHOT_OBJ_TYPE_IB, ptbase,
+						gpuaddr, size);
+				else {
+					ret = ib_add_gpu_object(device,
+						ptbase, gpuaddr, size);
+
+					if (ret < 0)
+						goto done;
+				}
 			} else {
 				ret = ib_parse_type3(device, &src[i], ptbase);
 
@@ -495,23 +417,28 @@ done:
 	return ret;
 }
 
-static inline int parse_ib(struct kgsl_device *device, unsigned int ptbase,
-		unsigned int gpuaddr, unsigned int dwords)
+static int snapshot_istore(struct kgsl_device *device, void *snapshot,
+	int remain, void *priv)
 {
-	unsigned int ib1base, ib2base;
-	int ret = 0;
+	struct kgsl_snapshot_istore *header = snapshot;
+	unsigned int *data = snapshot + sizeof(*header);
+	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
+	int count, i;
 
+	count = adreno_dev->istore_size * adreno_dev->instruction_size;
 
-	kgsl_regread(device, REG_CP_IB1_BASE, &ib1base);
-	kgsl_regread(device, REG_CP_IB2_BASE, &ib2base);
+	if (remain < (count * 4) + sizeof(*header)) {
+		KGSL_DRV_ERR(device,
+			"snapshot: Not enough memory for the istore section");
+		return 0;
+	}
 
-	if (gpuaddr == ib1base || gpuaddr == ib2base)
-		push_object(device, SNAPSHOT_OBJ_TYPE_IB, ptbase,
-			gpuaddr, dwords);
-	else
-		ret = ib_add_gpu_object(device, ptbase, gpuaddr, dwords);
+	header->count = adreno_dev->istore_size;
 
-	return ret;
+	for (i = 0; i < count; i++)
+		kgsl_regread(device, ADRENO_ISTORE_START + i, &data[i]);
+
+	return (count * 4) + sizeof(*header);
 }
 
 static int snapshot_rb(struct kgsl_device *device, void *snapshot,
@@ -613,20 +540,21 @@ static int snapshot_rb(struct kgsl_device *device, void *snapshot,
 
 			struct kgsl_memdesc *memdesc =
 				adreno_find_ctxtmem(device, ptbase, ibaddr,
-					ibsize << 2);
+					ibsize);
 
 			
 			if (NULL == memdesc)
 				if (kgsl_gpuaddr_in_memdesc(
 						&device->mmu.setstate_memory,
-						ibaddr, ibsize << 2))
+						ibaddr, ibsize))
 					memdesc = &device->mmu.setstate_memory;
 
-			if (memdesc != NULL)
+			if (ibaddr == ibbase || memdesc != NULL)
 				push_object(device, SNAPSHOT_OBJ_TYPE_IB,
 					ptbase, ibaddr, ibsize);
 			else
-				parse_ib(device, ptbase, ibaddr, ibsize);
+				ib_add_gpu_object(device, ptbase, ibaddr,
+					ibsize);
 		}
 
 		index = index + 1;
@@ -670,14 +598,15 @@ static int snapshot_ib(struct kgsl_device *device, void *snapshot,
 				continue;
 
 			if (adreno_cmd_is_ib(*src))
-				ret = parse_ib(device, obj->ptbase, src[1],
-					src[2]);
-			else
+				push_object(device, SNAPSHOT_OBJ_TYPE_IB,
+					obj->ptbase, src[1], src[2]);
+			else {
 				ret = ib_parse_type3(device, src, obj->ptbase);
 
-			
-			if (ret < 0)
-				break;
+				
+				if (ret < 0)
+					break;
+			}
 		}
 	}
 
@@ -755,6 +684,13 @@ void *adreno_snapshot(struct kgsl_device *device, void *snapshot, int *remain,
 
 	for (i = 0; i < objbufptr; i++)
 		snapshot = dump_object(device, i, snapshot, remain);
+
+
+	if (hang) {
+		snapshot = kgsl_snapshot_add_section(device,
+			KGSL_SNAPSHOT_SECTION_ISTORE, snapshot, remain,
+			snapshot_istore, NULL);
+	}
 
 	
 	if (adreno_dev->gpudev->snapshot)

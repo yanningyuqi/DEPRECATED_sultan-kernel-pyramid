@@ -1,21 +1,12 @@
 config MSM_KGSL
 	tristate "MSM 3D Graphics driver"
-	default y
+	default n
 	depends on ARCH_MSM && !ARCH_MSM7X00A && !ARCH_MSM7X25
 	select GENERIC_ALLOCATOR
 	select FW_LOADER
 	---help---
 	  3D graphics driver. Required to use hardware accelerated
 	  OpenGL ES 2.0 and 1.1.
-
-config MSM_KGSL_MAINLINE
-        bool "MSM 3D Graphics driver (branch jb_2.5)"
-	default y
-        depends on FB_MSM
-        help
-          3D graphics driver for Adreno200. Required to
-          use hardware accelerated OpenGL ES 2.0 and 1.1 on these
-          chips.
 
 config MSM_KGSL_CFF_DUMP
 	bool "Enable KGSL Common File Format (CFF) Dump Feature [Use with caution]"
@@ -106,6 +97,17 @@ config MSM_KGSL_DISABLE_SHADOW_WRITES
 	default n
 	depends on MSM_KGSL
 
+config MSM_KGSL_DEFAULT_GPUMMU
+	bool "Prefer gpummu than iommu"
+	default n
+
+config MSM_KGSL_PAGE_TABLE_SIZE_FOR_IOMMU
+	hex "Size of pagetables for iommu"
+	default 0x1FE00000
+	---help---
+	Sets the pagetable size used by the IOMMU.  The max value
+	is 0x1FE00000 or (512M - 1536K - little interval).
+
 config MSM_KGSL_KILL_HANG_PROCESS
 	bool "Enable killing recoverable gpu hang process routine"
 	default y
@@ -117,6 +119,6 @@ config MSM_KGSL_GPU_USAGE
 	default n
 
 config KGSL_COMPAT
-	bool "Compatibility with older kernel versions"
-	default y
-	depends on MSM_KGSL
+    bool "Compatibility with older kernel versions"
+    default y
+    depends on MSM_KGSL
