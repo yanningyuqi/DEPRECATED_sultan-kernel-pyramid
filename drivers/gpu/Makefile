@@ -1,4 +1,15 @@
-ccflags-y := -Ofast -fsingle-precision-constant -mtune=cortex-a8 -marm -march=armv7-a -mfpu=neon -ftree-vectorize -mvectorize-with-neon-double
-
 obj-y			+= drm/ vga/ stub/ ion/
-obj-$(CONFIG_MSM_KGSL)	+= msm/
+
+ifeq ($(CONFIG_MSM_KGSL_MAINLINE),y)
+    obj-y += msm/
+endif
+
+ifeq ($(CONFIG_MSM_KGSL_JB_MR1),y)
+    obj-y += msm_mr1/
+endif
+
+ifeq ($(CONFIG_MSM_KGSL_JB_REL_RB31),y)
+    obj-y += msm_rb31/
+endif
+
+

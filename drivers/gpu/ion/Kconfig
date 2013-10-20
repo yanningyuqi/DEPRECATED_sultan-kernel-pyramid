@@ -1,6 +1,7 @@
 menuconfig ION
 	tristate "Ion Memory Manager"
 	select GENERIC_ALLOCATOR
+	select DMA_SHARED_BUFFER
 	help
 	  Chose this option to enable the ION Memory Manager.
 
@@ -13,6 +14,5 @@ config ION_TEGRA
 config ION_MSM
 	tristate "Ion for MSM"
 	depends on ARCH_MSM && ION
-	select MSM_MULTIMEDIA_USE_ION
 	help
 	  Choose this option if you wish to use ion on an MSM target.
