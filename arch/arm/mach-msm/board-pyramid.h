@@ -61,7 +61,7 @@
 /* Note: must be multiple of 4096 */
 #define MSM_FB_SIZE 0x6F0000
 
-#define MSM_PMEM_MDP_SIZE	0x22F0000
+#define MSM_PMEM_MDP_SIZE	0x2A90000
 #define MSM_PMEM_ADSP_SIZE	0x1800000
 #define MSM_PMEM_AUDIO_SIZE	0x239000
 
@@ -69,12 +69,10 @@
 #define MSM_FB_WRITEBACK_BASE	(0x45C00000)
 #endif
 
-#define MSM_FB_BASE		(0x42700000)
-
 #define MSM_PMEM_MDP_BASE	(0x40400000)
 #define MSM_PMEM_AUDIO_BASE	(0x46400000)
-
-#define MSM_PMEM_ADSP_BASE	(0x70000000 - MSM_PMEM_ADSP_SIZE)
+#define MSM_PMEM_ADSP_BASE	(0x6F900000 - MSM_PMEM_ADSP_SIZE)
+#define MSM_FB_BASE		(0x70000000 - MSM_FB_SIZE)
 
 /* Kernel SMI PMEM Region for video core, used for Firmware */
 /* and encoder,decoder scratch buffers */
