@@ -2505,3 +2505,4 @@ MODULE_PARM_DESC(product, "User specified product ID");
 
 module_param(ndi_latency_timer, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(ndi_latency_timer, "NDI device latency timer override");
+

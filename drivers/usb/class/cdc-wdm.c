@@ -58,8 +58,6 @@ MODULE_DEVICE_TABLE (usb, wdm_ids);
 
 #define WDM_MAX			16
 
-/* CDC-WMC r1.1 requires wMaxCommand to be "at least 256 decimal (0x100)" */
-#define WDM_DEFAULT_BUFSIZE	256
 
 static DEFINE_MUTEX(wdm_mutex);
 
@@ -474,8 +472,6 @@ retry:
 		}
 
 		if (!desc->reslength) { /* zero length read */
-			dev_dbg(&desc->intf->dev, "%s: zero length - clearing WDM_READ\n", __func__);
-			clear_bit(WDM_READ, &desc->flags);
 			spin_unlock_irq(&desc->iuspin);
 			goto retry;
 		}
@@ -530,7 +526,7 @@ static unsigned int wdm_poll(struct file *file, struct poll_table_struct *wait)
 
 	spin_lock_irqsave(&desc->iuspin, flags);
 	if (test_bit(WDM_DISCONNECTING, &desc->flags)) {
-		mask = POLLHUP | POLLERR;
+		mask = POLLERR;
 		spin_unlock_irqrestore(&desc->iuspin, flags);
 		goto desc_out;
 	}
@@ -669,7 +665,7 @@ static int wdm_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	struct usb_cdc_dmm_desc *dmhd;
 	u8 *buffer = intf->altsetting->extra;
 	int buflen = intf->altsetting->extralen;
-	u16 maxcom = WDM_DEFAULT_BUFSIZE;
+	u16 maxcom = 0;
 
 	if (!buffer)
 		goto out;
