@@ -245,4 +245,3 @@ struct ti_firmware_header {
 #define TI_UART_OFFSET_MCR		0x0004	/* UART MCR register offset */
 
 #endif /* _TI_3410_5052_H_ */
-

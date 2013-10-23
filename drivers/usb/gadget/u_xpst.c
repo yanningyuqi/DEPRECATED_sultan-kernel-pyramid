@@ -11,9 +11,6 @@
  * GNU General Public License for more details.
  *
  */
-#if defined(CONFIG_MACH_MECHA)
-#include <mach/smsc251x.h>
-#endif
 
 struct diag_context _context;
 static struct usb_diag_ch *legacych;
@@ -551,10 +548,6 @@ static int htc_diag_open(struct inode *ip, struct file *fp)
 
 	DIAG_INFO("%s:%s(parent:%s): tgid=%d\n", __func__,
 			current->comm, current->parent->comm, current->tgid);
-	if (!ctxt->ready) {
-		DIAG_INFO("%s: USB driver do not load\n", __func__);
-		return -EINVAL;
-	}
 
 	mutex_lock(&ctxt->user_lock);
 
@@ -826,10 +819,6 @@ static int diag2arm9_open(struct inode *ip, struct file *fp)
 	int rc = 0;
 	int n;
 	DIAG_INFO("%s\n", __func__);
-	if (!ctxt->ready) {
-		DIAG_INFO("%s: USB driver do not load\n", __func__);
-		return -EINVAL;
-	}
 	mutex_lock(&ctxt->diag2arm9_lock);
 	if (ctxt->diag2arm9_opened) {
 		pr_err("%s: already opened\n", __func__);
@@ -947,7 +936,7 @@ static ssize_t diag2arm9_write(struct file *fp, const char __user *buf,
 					return -ENOMEM;
 				}
 				memcpy(buf_9k, ctxt->DM_buf, writed);
-				/*msm_sdio_diag_write((void *)buf_9k, writed);*/
+				msm_sdio_diag_write((void *)buf_9k, writed);
 				buf_9k = NULL;
 			}
 #endif
@@ -992,7 +981,7 @@ static ssize_t diag2arm9_write(struct file *fp, const char __user *buf,
 					return -ENOMEM;
 				}
 				memcpy(buf_9k, ctxt->DM_buf, writed);
-				/*msm_sdio_diag_write((void *)buf_9k, writed);*/
+				msm_sdio_diag_write((void *)buf_9k, writed);
 				buf_9k = NULL;
 			}
 #endif
@@ -1024,7 +1013,7 @@ static ssize_t diag2arm9_write(struct file *fp, const char __user *buf,
 						mutex_unlock(&ctxt->diag2arm9_write_lock);
 						return -EINVAL;
 					}
-					/*msm_sdio_diag_write((void *)buf_9k, writed);*/
+					msm_sdio_diag_write((void *)buf_9k, writed);
 					buf_9k = NULL;
 				}
 #endif

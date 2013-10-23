@@ -1776,4 +1776,3 @@ static int ti_download_firmware(struct ti_device *tdev)
 
 	return 0;
 }
-
