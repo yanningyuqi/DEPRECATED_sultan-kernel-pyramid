@@ -510,11 +510,11 @@ static struct platform_device lcdc_samsung_panel_device = {
 	}
 };
 
-#define BRI_SETTING_MIN                 30
+#define BRI_SETTING_MIN                 25
 #define BRI_SETTING_DEF                 143
 #define BRI_SETTING_MAX                 255
 
-#define SHARP_PWM_MIN                   9	/* 3.5% of max pwm */
+#define SHARP_PWM_MIN                   7	/* 3.6% of max pwm */
 #define SHARP_PWM_DEFAULT               69	/* 27% of max pwm  */
 #define SHARP_PWM_MAX                   194	/* 76% of max pwm */
 
