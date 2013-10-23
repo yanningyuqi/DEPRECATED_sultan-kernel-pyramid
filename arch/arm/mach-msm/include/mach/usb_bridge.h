@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -21,6 +21,10 @@
  * bridge device 1 : Tethered RMNET
  */
 #define MAX_BRIDGE_DEVICES 2
+
+/*PID 9001*/
+#define DUN_IFACE_NUM 2
+#define TETHERED_RMNET_IFACE_NUM 3
 
 struct bridge_ops {
 	int (*send_pkt)(void *, void *, size_t actual);
