@@ -80,7 +80,7 @@ static struct asmp_tuners {
 } asmp_tuners_ins = {
 	.delay = ASMP_DELAY,
 	.pause = ASMP_PAUSE,
-	.scroff_single_core = true,
+	.scroff_single_core = false,
 	.max_cpus = CONFIG_NR_CPUS,
 	.min_cpus = 1,
 	.load_limit_up = 35,
