@@ -33,7 +33,11 @@ obj-y				+= tty/
 obj-y				+= char/
 
 # gpu/ comes after char for AGP vs DRM startup
+ifdef CONFIG_PYRAMID_SENSE_ICS
+obj-y				+= gpu-legacy/
+else
 obj-y				+= gpu/
+endif
 
 obj-$(CONFIG_CONNECTOR)		+= connector/
 

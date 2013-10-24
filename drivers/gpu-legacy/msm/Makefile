@@ -1,4 +1,4 @@
-ccflags-y := -Iinclude/drm -Idrivers/gpu/msm
+ccflags-y := -Iinclude/drm -Idrivers/gpu-legacy/msm
 
 msm_kgsl_core-y = \
 	kgsl.o \

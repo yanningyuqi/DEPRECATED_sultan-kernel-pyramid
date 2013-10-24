@@ -25,7 +25,13 @@ source "drivers/gpu/stub/Kconfig"
 
 source "drivers/gpu/ion/Kconfig"
 
+if PYRAMID_SENSE_ICS
+source "drivers/gpu-legacy/msm/Kconfig"
+endif
+
+if PYRAMID_AOSP
 source "drivers/gpu/msm/Kconfig"
+endif
 
 config VGASTATE
        tristate
