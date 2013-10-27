@@ -40,11 +40,11 @@ enum tsens_trip_type {
 #define TSENS_CAL_DEGC					30
 #define TSENS_MAIN_SENSOR				0
 
-#define TSENS_8960_QFPROM_ADDR0		(MSM_QFPROM_BASE + 0x00000404)
+#define TSENS_8960_QFPROM_ADDR0		(MSM_QFPROM_BASE + 0x000000bc)
 #define TSENS_8960_QFPROM_SPARE_ADDR0	(MSM_QFPROM_BASE + 0x00000414)
 #define TSENS_8960_CONFIG				0x9b
-#define TSENS_8960_CONFIG_SHIFT				0
-#define TSENS_8960_CONFIG_MASK		(0xf << TSENS_8960_CONFIG_SHIFT)
+#define TSENS_8960_CONFIG_SHIFT        28
+#define TSENS_8960_CONFIG_MASK    (3 << TSENS_8960_CONFIG_SHIFT)
 #define TSENS_CNTL_ADDR			(MSM_CLK_CTL_BASE + 0x00003620)
 #define TSENS_EN					BIT(0)
 #define TSENS_SW_RST					BIT(1)
@@ -61,7 +61,7 @@ enum tsens_trip_type {
 #define TSENS_UPPER_STATUS_CLR				BIT(10)
 #define TSENS_MAX_STATUS_MASK				BIT(11)
 #define TSENS_MEASURE_PERIOD				4 /* 1 sec. default */
-#define TSENS_8960_SLP_CLK_ENA				BIT(26)
+#define TSENS_8960_SLP_CLK_ENA				BIT(24)
 
 #define TSENS_THRESHOLD_ADDR		(MSM_CLK_CTL_BASE + 0x00003624)
 #define TSENS_THRESHOLD_MAX_CODE			0xff
@@ -877,6 +877,6 @@ module_init(tsens_tm_init);
 module_exit(tsens_tm_remove);
 
 MODULE_LICENSE("GPL v2");
-MODULE_DESCRIPTION("MSM8960 Temperature Sensor driver");
+MODULE_DESCRIPTION("MSM8x60 Temperature Sensor driver");
 MODULE_VERSION("1.0");
-MODULE_ALIAS("platform:tsens8960-tm");
+MODULE_ALIAS("platform:tsens8x60-tm");
