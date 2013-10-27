@@ -1574,12 +1574,12 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 		mfd->panel_info.type != TV_PANEL) {
 		mfd->early_suspend.suspend = msmfb_early_suspend;
 		mfd->early_suspend.resume = msmfb_early_resume;
-		mfd->early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB - 10;
+		mfd->early_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB - 2;
 		register_early_suspend(&mfd->early_suspend);
 #ifdef CONFIG_HTC_ONMODE_CHARGING
 		mfd->onchg_suspend.suspend = msmfb_onchg_suspend;
 		mfd->onchg_suspend.resume = msmfb_onchg_resume;
-		mfd->onchg_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB - 10;
+		mfd->onchg_suspend.level = EARLY_SUSPEND_LEVEL_DISABLE_FB - 2;
 		register_onchg_suspend(&mfd->onchg_suspend);
 #endif
 	}
