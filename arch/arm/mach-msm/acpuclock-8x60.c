@@ -878,7 +878,11 @@ int processor_name_read_proc(char *page, char **start, off_t off,
 			   int count, int *eof, void *data)
 {
 	char *p = page;
+#ifdef CONFIG_MSM_CPU_FREQ_SET_MIN_MAX
 		p += sprintf(p, "%u", (CONFIG_MSM_CPU_FREQ_MAX/1000));
+#else
+		p += sprintf(p, "%u", (1512000/1000));
+#endif
 		p += sprintf(p, "MHz x2");
 	return p - page;
 }
