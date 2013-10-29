@@ -115,7 +115,7 @@ static void check_temp(struct work_struct *work)
 		goto reschedule;
 	}
 
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		update_policy = 0;
 		cpu_policy = cpufreq_cpu_get(cpu);
 		if (!cpu_policy) {
@@ -139,13 +139,10 @@ static void check_temp(struct work_struct *work)
 			if (cpu_policy->max < cpu_policy->cpuinfo.max_freq) {
 				if (pre_throttled_max != 0)
 					max_freq = pre_throttled_max;
-				else if ((pre_throttled_max == 0) && (cpu == 1)) {
-					pr_warn("msm_thermal: ERROR! core1 was hotplugged");
-				}
-				else if ((pre_throttled_max == 0) && (cpu == 0)) {
+				else {
 					max_freq = 1512000;
-					pr_err("msm_thermal: FATAL ERROR! pre_throttled_max=0 on core0!\n");
-					pr_err("msm_thermal: Falling back to 1512MHz on core0 to avoid a meltdown\n");
+					pr_err("msm_thermal: FATAL ERROR! pre_throttled_max=0!\n");
+					pr_err("msm_thermal: Falling back to 1512MHz to avoid a meltdown\n");
 				}
 				update_policy = 1;
 				/* wait until 2nd core is unthrottled */
@@ -213,7 +210,7 @@ static void disable_msm_thermal(void)
 	cancel_delayed_work(&check_temp_work);
 	flush_scheduled_work();
 
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		cpu_policy = cpufreq_cpu_get(cpu);
 		if (cpu_policy) {
 			if (cpu_policy->max < cpu_policy->cpuinfo.max_freq)
