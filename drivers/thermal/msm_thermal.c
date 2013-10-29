@@ -91,7 +91,7 @@ static int update_cpu_max_freq(struct cpufreq_policy *cpu_policy,
 
 	ret = cpufreq_update_policy(cpu);
 	if (!ret)
-		pr_info("msm_thermal: Limiting core%d max frequency to %d\n",
+		pr_info("msm_thermal: Setting core%d max frequency to %d\n",
 			cpu, max_freq);
 
 	return ret;
@@ -129,7 +129,7 @@ static void check_temp(struct work_struct *work)
 		    (cpu_policy->max > msm_thermal_tuners_ins.allowed_low_freq)) {
 			update_policy = 1;
 			/* save pre-throttled max freq value */
-			pre_throttled_max = cpu_policy->max;
+			pre_throttled_max = cpu_policy->user_policy.max;
 			max_freq = msm_thermal_tuners_ins.allowed_low_freq;
 			thermal_throttled = 1;
 			pr_warn("msm_thermal: Thermal Throttled (low)! temp: %lu\n", temp);
@@ -139,9 +139,13 @@ static void check_temp(struct work_struct *work)
 			if (cpu_policy->max < cpu_policy->cpuinfo.max_freq) {
 				if (pre_throttled_max != 0)
 					max_freq = pre_throttled_max;
-				else {
-					max_freq = cpu_policy->cpuinfo.max_freq;
-					pr_warn("msm_thermal: ERROR! pre_throttled_max=0, falling back to %u\n", max_freq);
+				else if ((pre_throttled_max == 0) && (cpu == 1)) {
+					pr_warn("msm_thermal: ERROR! core1 was hotplugged");
+				}
+				else if ((pre_throttled_max == 0) && (cpu == 0)) {
+					max_freq = 1512000;
+					pr_err("msm_thermal: FATAL ERROR! pre_throttled_max=0 on core0!\n");
+					pr_err("msm_thermal: Falling back to 1512MHz on core0 to avoid a meltdown\n");
 				}
 				update_policy = 1;
 				/* wait until 2nd core is unthrottled */
