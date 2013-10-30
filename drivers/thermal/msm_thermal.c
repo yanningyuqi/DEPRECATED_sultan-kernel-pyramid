@@ -185,10 +185,16 @@ static void check_temp(struct work_struct *work)
 		//max trip point
 		} else if ((temp >= msm_thermal_tuners_ins.allowed_max_high) &&
 			   (cpu_policy->max > msm_thermal_tuners_ins.allowed_max_freq)) {
-			update_policy = 1;
-			max_freq = msm_thermal_tuners_ins.allowed_max_freq;
-			thermal_throttled = 3;
-			pr_warn("msm_thermal: Thermal Throttled (max)! temp: %lu\n", temp);
+			if (temp > 1000) {
+				pr_err("msm_thermal: ERROR! Temperature is way out of bounds!\n");
+				pr_err("msm_thermal: temp: %lu\n", temp);
+				goto reschedule;
+			} else {
+				update_policy = 1;
+				max_freq = msm_thermal_tuners_ins.allowed_max_freq;
+				thermal_throttled = 3;
+				pr_warn("msm_thermal: Thermal Throttled (max)! temp: %lu\n", temp);
+			}
 		//max clr point
 		} else if ((temp < msm_thermal_tuners_ins.allowed_max_low) &&
 			   (thermal_throttled > 2)) {
