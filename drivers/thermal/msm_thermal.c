@@ -42,8 +42,9 @@ static int enabled;
 //Throttling indicator, 0=not throttled, 1=low, 2=mid, 3=max
 static int thermal_throttled = 0;
 
-//Safe the cpu max freq before throttling
-static int pre_throttled_max = 0;
+//Save the cpu max freq for each core before throttling
+static int pre_throt_max0 = 0;
+static int pre_throt_max1 = 0;
 
 static struct delayed_work check_temp_work;
 
@@ -128,8 +129,12 @@ static void check_temp(struct work_struct *work)
 		    (temp < msm_thermal_tuners_ins.allowed_mid_high) &&
 		    (cpu_policy->max > msm_thermal_tuners_ins.allowed_low_freq)) {
 			update_policy = 1;
-			/* save pre-throttled max freq value */
-			pre_throttled_max = cpu_policy->user_policy.max;
+			/* save pre-throttled max freq value for each core */
+		if (cpu == 0) {
+			pre_throt_max0 = cpu_policy->user_policy.max;
+		} else if (cpu == 1) {
+			pre_throt_max1 = cpu_policy->user_policy.max;
+		}
 			max_freq = msm_thermal_tuners_ins.allowed_low_freq;
 			thermal_throttled = 1;
 			pr_warn("msm_thermal: Thermal Throttled (low)! temp: %lu\n", temp);
@@ -137,14 +142,22 @@ static void check_temp(struct work_struct *work)
 		} else if ((temp < msm_thermal_tuners_ins.allowed_low_low) &&
 			   (thermal_throttled > 0)) {
 			if (cpu_policy->max < cpu_policy->cpuinfo.max_freq) {
-				if (pre_throttled_max != 0)
-					max_freq = pre_throttled_max;
-				else {
-					max_freq = 1512000;
-					pr_err("msm_thermal: FATAL ERROR! pre_throttled_max=0!\n");
-					pr_err("msm_thermal: Falling back to 1512MHz to avoid a meltdown\n");
-				}
 				update_policy = 1;
+				if ((pre_throt_max0 != 0) && (pre_throt_max1 != 0)) {
+					if (cpu == 0) {
+					max_freq = pre_throt_max0;
+					} else if (cpu == 1) {
+					max_freq = pre_throt_max1;
+					}
+				} else if ((pre_throt_max0 == 0) && (pre_throt_max1 != 0)) {
+				max_freq = pre_throt_max1;
+				} else if ((pre_throt_max0 != 0) && (pre_throt_max1 == 0)) {
+				max_freq = pre_throt_max0;
+				} else if ((pre_throt_max0 == 0) && (pre_throt_max1 == 0)) {
+				max_freq = 1566000;
+				pr_err("msm_thermal: FATAL ERROR! pre_throt_max0=0 and pre_throt_max1=0!\n");
+				pr_err("msm_thermal: Falling back to 1566MHz to avoid a meltdown!\n");
+				}
 				/* wait until 2nd core is unthrottled */
 				if (cpu == 1)
 					thermal_throttled = 0;
