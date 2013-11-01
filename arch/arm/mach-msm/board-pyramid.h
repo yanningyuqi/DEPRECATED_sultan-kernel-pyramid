@@ -96,7 +96,6 @@
 #define MSM_PMEM_KERNEL_EBI1_SIZE  0x600000 /* (6MB) For QSECOM */
 #define MSM_PMEM_ADSP2_SIZE	0x1700000
 #define MSM_ION_SF_SIZE       MSM_PMEM_MDP_SIZE
-#define MSM_ION_CAMERA_SIZE   0x2000000
 #define MSM_ION_ROTATOR_SIZE  MSM_PMEM_ADSP2_SIZE
 #define MSM_ION_MM_FW_SIZE    0x200000  /* KERNEL_SMI_SIZE */
 #define MSM_ION_MM_SIZE       0x3D00000 /* USER_SMI_SIZE */
@@ -105,9 +104,9 @@
 
 #ifdef CONFIG_TZCOM
 #define MSM_ION_QSECOM_SIZE   MSM_PMEM_KERNEL_EBI1_SIZE
-#define MSM_ION_HEAP_NUM      9
-#else
 #define MSM_ION_HEAP_NUM      8
+#else
+#define MSM_ION_HEAP_NUM      7
 #endif
 
 #define MSM_ION_CAMERA_BASE   (0x40E00000)	/* start from (MSM_FB_BASE + MSM_FB_SIZE), and align to 1MB */
