@@ -385,6 +385,8 @@ struct scatterlist *ion_map_dma(struct ion_client *client,
  */
 void ion_unmap_dma(struct ion_client *client, struct ion_handle *handle);
 
+struct ion_handle *ion_import_dma_buf(struct ion_client *client, int fd);
+
 /**
  * ion_share() - given a handle, obtain a buffer to pass to other clients
  * @client:	the client
@@ -610,6 +612,11 @@ static inline void ion_unmap_dma(struct ion_client *client,
 
 static inline struct ion_buffer *ion_share(struct ion_client *client,
 	struct ion_handle *handle)
+{
+	return ERR_PTR(-ENODEV);
+}
+
+static inline struct ion_handle *ion_import_dma_buf(struct ion_client *client, int fd)
 {
 	return ERR_PTR(-ENODEV);
 }

@@ -20,6 +20,7 @@
 #include "vcd_client_sm.h"
 #include "vcd_core.h"
 #include "vcd_device_sm.h"
+extern u32 vidc_msg_debug;
 
 void vcd_reset_device_channels(struct vcd_dev_ctxt *dev_ctxt);
 
@@ -395,4 +396,7 @@ u32 vcd_req_perf_level(struct vcd_clnt_ctxt *cctxt,
 
 u32 vcd_set_num_slices(struct vcd_clnt_ctxt *cctxt);
 
+u32 vcd_update_decoder_perf_level(struct vcd_dev_ctxt *dev_ctxt, u32 perf_lvl);
+
+u32 vcd_set_perf_turbo_level(struct vcd_clnt_ctxt *cctxt);
 #endif
