@@ -1904,7 +1904,6 @@ static int __init pmem_mdp_size_setup(char *p)
 	return 0;
 }
 early_param("pmem_mdp_size", pmem_mdp_size_setup);
-#endif
 
 static unsigned pmem_adsp_size = MSM_PMEM_ADSP_SIZE;
 
@@ -1914,6 +1913,7 @@ static int __init pmem_adsp_size_setup(char *p)
 	return 0;
 }
 early_param("pmem_adsp_size", pmem_adsp_size_setup);
+#endif
 
 static unsigned pmem_audio_size = MSM_PMEM_AUDIO_SIZE;
 
@@ -1936,7 +1936,7 @@ static struct resource msm_fb_resources[] = {
 };
 
 #ifdef CONFIG_ANDROID_PMEM
-
+#ifndef CONFIG_ION_MSM
 static struct android_pmem_platform_data android_pmem_pdata = {
 	.name = "pmem",
 	.allocator_type = PMEM_ALLOCATORTYPE_ALLORNOTHING,
@@ -1960,6 +1960,7 @@ static struct platform_device android_pmem_adsp_device = {
 	.id = 2,
 	.dev = { .platform_data = &android_pmem_adsp_pdata },
 };
+#endif
 
 static struct android_pmem_platform_data android_pmem_audio_pdata = {
 	.name = "pmem_audio",
@@ -2197,6 +2198,7 @@ static struct platform_device *hdmi_devices[] __initdata = {
 };
 #endif /* CONFIG_FB_MSM_HDMI_MSM_PANEL */
 
+#ifndef CONFIG_ION_MSM
 static struct android_pmem_platform_data android_pmem_smipool_pdata = {
 	.name = "pmem_smipool",
 	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
@@ -2212,6 +2214,8 @@ static struct platform_device android_pmem_smipool_device = {
 	.id = 7,
 	.dev = { .platform_data = &android_pmem_smipool_pdata },
 };
+#endif
+
 #endif
 
 static void __init msm8x60_allocate_memory_regions(void)
@@ -3491,10 +3495,12 @@ static struct platform_device *pyramid_devices[] __initdata = {
 	&msm_batt_device,
 #endif
 #ifdef CONFIG_ANDROID_PMEM
+#ifndef CONFIG_ION_MSM
 	&android_pmem_device,
 	&android_pmem_adsp_device,
-	&android_pmem_audio_device,
 	&android_pmem_smipool_device,
+#endif
+	&android_pmem_audio_device,
 #endif
 #ifdef CONFIG_MSM_ROTATOR
 	&msm_rotator_device,
@@ -3617,9 +3623,9 @@ static void __init size_pmem_devices(void)
 #ifdef CONFIG_ANDROID_PMEM
 #ifndef CONFIG_ION_MSM
 	size_pmem_device(&android_pmem_pdata, MSM_PMEM_MDP_BASE, pmem_mdp_size);
-#endif
 	size_pmem_device(&android_pmem_adsp_pdata, MSM_PMEM_ADSP_BASE, pmem_adsp_size);
 	size_pmem_device(&android_pmem_smipool_pdata, MSM_PMEM_SMIPOOL_BASE, MSM_PMEM_SMIPOOL_SIZE);
+#endif
 	size_pmem_device(&android_pmem_audio_pdata, MSM_PMEM_AUDIO_BASE, MSM_PMEM_AUDIO_SIZE);
 #endif
 }
@@ -3656,9 +3662,11 @@ static void __init reserve_memory_for(struct android_pmem_platform_data *p)
 static void __init reserve_pmem_memory(void)
 {
 #ifdef CONFIG_ANDROID_PMEM
+#ifndef CONFIG_ION_MSM
 	reserve_memory_for(&android_pmem_pdata);
 	reserve_memory_for(&android_pmem_adsp_pdata);
 	reserve_memory_for(&android_pmem_smipool_pdata);
+#endif
 	reserve_memory_for(&android_pmem_audio_pdata);
 #endif
 }
