@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -88,7 +88,7 @@ u32 ddl_device_init(struct ddl_init_config *ddl_init_config,
 			ddl_context->dram_base_a.align_virtual_addr;
 	}
 	if (!status) {
-		ddl_context->metadata_shared_input.mem_type = DDL_FW_MEM;
+		ddl_context->metadata_shared_input.mem_type = DDL_MM_MEM;
 		ptr = ddl_pmem_alloc(&ddl_context->metadata_shared_input,
 			DDL_METADATA_TOTAL_INPUTBUFSIZE,
 			DDL_LINEAR_BUFFER_ALIGN_BYTES);
@@ -164,9 +164,7 @@ u32 ddl_open(u32 **ddl_handle, u32 decoding)
 		DDL_MSG_ERROR("ddl_open:Client_trasac_failed");
 		return status;
 	}
-	if (res_trk_check_for_sec_session())
-		ddl->shared_mem[0].mem_type = DDL_CMD_MEM;
-	else
+	ddl->shared_mem[0].mem_type = DDL_CMD_MEM;
 		ddl->shared_mem[0].mem_type = DDL_FW_MEM;
 	ptr = ddl_pmem_alloc(&ddl->shared_mem[0],
 			DDL_FW_AUX_HOST_CMD_SPACE_SIZE, 0);
@@ -174,9 +172,7 @@ u32 ddl_open(u32 **ddl_handle, u32 decoding)
 		status = VCD_ERR_ALLOC_FAIL;
 	if (!status && ddl_context->frame_channel_depth
 		== VCD_DUAL_FRAME_COMMAND_CHANNEL) {
-		if (res_trk_check_for_sec_session())
-			ddl->shared_mem[1].mem_type = DDL_CMD_MEM;
-		else
+		ddl->shared_mem[1].mem_type = DDL_CMD_MEM;
 			ddl->shared_mem[1].mem_type = DDL_FW_MEM;
 		ptr = ddl_pmem_alloc(&ddl->shared_mem[1],
 				DDL_FW_AUX_HOST_CMD_SPACE_SIZE, 0);
@@ -198,7 +194,8 @@ u32 ddl_open(u32 **ddl_handle, u32 decoding)
 		ddl->client_state = DDL_CLIENT_OPEN;
 		ddl->codec_data.hdr.decoding = decoding;
 		ddl->decoding = decoding;
-		ddl_set_default_meta_data_hdr(ddl);
+		if (!res_trk_check_for_sec_session())
+			ddl_set_default_meta_data_hdr(ddl);
 		ddl_set_initial_default_values(ddl);
 		*ddl_handle	= (u32 *) ddl;
 	} else {
@@ -293,11 +290,6 @@ u32 ddl_encode_start(u32 *ddl_handle, void *client_data)
 		DDL_MSG_ERROR("ddl_enc_start:Seq_hdr_alloc_failed");
 		return VCD_ERR_ALLOC_FAIL;
 	}
-	msm_ion_do_cache_op(ddl_context->video_ion_client,
-				encoder->seq_header.alloc_handle,
-				encoder->seq_header.virtual_base_addr,
-				encoder->seq_header.buffer_size,
-				ION_IOC_CLEAN_INV_CACHES);
 	if (encoder->slice_delivery_info.enable) {
 		DDL_MSG_LOW("%s: slice mode allocate memory for struct\n",
 					__func__);
@@ -471,15 +463,12 @@ u32 ddl_encode_frame(u32 *ddl_handle,
 	struct ddl_encoder_data *encoder =
 		&ddl->codec_data.encoder;
 	u32 vcd_status = VCD_S_SUCCESS;
+
 	struct vcd_transc *transc;
-	
-	if (!ddl) {
-		DDL_MSG_ERROR("ddl_enc_frame:Bad_handle");
-		return VCD_ERR_BAD_HANDLE;
-	}
-	
 	transc = (struct vcd_transc *)(ddl->client_data);
-	DDL_MSG_LOW("%s: transc = 0x%x", __func__, (u32)ddl->client_data);
+	DDL_MSG_LOW("%s: transc = 0x%x, in_use = %u",
+				 __func__, (u32)ddl->client_data, transc->in_use);
+
 	if (encoder->slice_delivery_info.enable) {
 		return ddl_encode_frame_batch(ddl_handle,
 					input_frame,
