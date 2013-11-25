@@ -698,10 +698,8 @@ kgsl_get_process_private(struct kgsl_device *device,
 
 	if (!private->kobj.parent)
 		kgsl_process_init_sysfs(private);
-#ifdef CONFIG_DEBUG_FS
 	if (!private->debug_root)
 		kgsl_process_init_debugfs(private);
-#endif
 
 	mutex_unlock(&private->process_private_mutex);
 	return private;
