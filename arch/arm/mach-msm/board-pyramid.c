@@ -3568,13 +3568,6 @@ static struct platform_device *pyramid_devices[] __initdata = {
 };
 
 static struct memtype_reserve msm8x60_reserve_table[] __initdata = {
-#if defined(CONFIG_MSM_MULTIMEDIA_USE_ION)
-	[MEMTYPE_SMI] = {
-		.start	=	MSM_SMI_BASE,
-		.limit	=	MSM_SMI_SIZE,
-		.flags	=	MEMTYPE_FLAGS_FIXED,
-	},
-#else
 	/* Kernel SMI memory pool for video core, used for firmware */
 	/* and encoder, decoder scratch buffers */
 	/* Kernel SMI memory pool should always precede the user space */
@@ -3593,7 +3586,6 @@ static struct memtype_reserve msm8x60_reserve_table[] __initdata = {
 		.limit	=	USER_SMI_SIZE,
 		.flags	=	MEMTYPE_FLAGS_FIXED,
 	},
-#endif
 	[MEMTYPE_EBI0] = {
 		.flags	=	MEMTYPE_FLAGS_1M_ALIGN,
 	},
