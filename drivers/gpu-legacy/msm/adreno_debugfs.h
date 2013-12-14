@@ -25,20 +25,10 @@ static inline int kgsl_pmregs_enabled(void)
 	return kgsl_pm_regs_enabled;
 }
 
+#else
 static inline int adreno_debugfs_init(struct kgsl_device *device)
 {
 	return 0;
-}
-
-static inline int is_adreno_ib_dump_on_pagef_enabled(struct kgsl_device *device)
-{
-	return adreno_ib_dump_on_pagef_enabled;
-}
-
-#else
-static inline int is_adreno_ib_dump_on_pagef_enabled(struct kgsl_device *device)
-{
-	return 1;
 }
 
 static inline int kgsl_pmregs_enabled(void)
@@ -49,5 +39,9 @@ static inline int kgsl_pmregs_enabled(void)
 
 #endif
 
+static inline int is_adreno_ib_dump_on_pagef_enabled(struct kgsl_device *device)
+{
+	return adreno_ib_dump_on_pagef_enabled;
+}
 
 #endif /* __ADRENO_DEBUGFS_H */
