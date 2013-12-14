@@ -138,13 +138,8 @@ obj-$(CONFIG_FB_MSM_TVOUT) += tvout_msm.o
 
 obj-$(CONFIG_FB_MSM_EXTMDDI_SVGA) += mddi_ext_lcd.o
 
-ifeq ($(CONFIG_PYRAMID_SENSE_ICS),y)
-obj-$(CONFIG_MSM_VIDC_720P) += vidc-legacy/
-obj-$(CONFIG_MSM_VIDC_1080P) += vidc-legacy/
-else
 obj-$(CONFIG_MSM_VIDC_720P) += vidc/
 obj-$(CONFIG_MSM_VIDC_1080P) += vidc/
-endif
 
 obj-$(CONFIG_FB_MSM_HDMI_MHL_SII9234)  += sii9234/
 
