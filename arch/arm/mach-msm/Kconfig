@@ -1203,14 +1203,6 @@ choice
 	    prompt "Package 4"
 endchoice
 
-config PYRAMID_SENSE_ICS
-	bool "Build the kernel to support Sense ICS"
-	default n
-	help
-	This builds the kernel to support Sense ICS. This option
-	enables legacy vidc drivers and a slightly different
-	memory map.
-
 config MSM_SMD0_WQ
 	bool "SMD0 TTY Workqueue"
 	depends on (MSM_SMD)
