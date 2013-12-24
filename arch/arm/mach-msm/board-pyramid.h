@@ -88,12 +88,12 @@
 #define MSM_SMI_ION_BASE      (0x40400000)
 #define MSM_ION_WB_BASE       (0x45C00000)
 #define MSM_PMEM_AUDIO_BASE   (0x46400000)
-#define MSM_ION_SF_BASE       (0x6C200000)
+#define MSM_ION_SF_BASE       (0x6C000000)
 #define MSM_PMEM_ADSP_BASE    (0x6E800000)
 
 // Userspace allocation
 #define PHY_BASE_ADDR1  0x48000000
-#define SIZE_ADDR1      0x24200000
+#define SIZE_ADDR1      0x24000000
 /*** END Memory map ***/
 
 /* GPIO definition */
