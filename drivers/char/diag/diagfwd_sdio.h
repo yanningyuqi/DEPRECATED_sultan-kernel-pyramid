@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2010, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -10,13 +10,18 @@
  * GNU General Public License for more details.
  */
 
-#ifndef DIAGMEM_H
-#define DIAGMEM_H
-#include "diagchar.h"
+#ifndef DIAGFWD_SDIO_H
+#define DIAGFWD_SDIO_H
 
-void *diagmem_alloc(struct diagchar_dev *driver, int size, int pool_type);
-void diagmem_free(struct diagchar_dev *driver, void *buf, int pool_type);
-void diagmem_init(struct diagchar_dev *driver);
-void diagmem_exit(struct diagchar_dev *driver, int pool_type);
+#include <mach/sdio_al.h>
+#define N_MDM_WRITE	1 /* Upgrade to 2 with ping pong buffer */
+#define N_MDM_READ	1
+
+void diagfwd_sdio_init(void);
+void diagfwd_sdio_exit(void);
+int diagfwd_connect_sdio(void);
+int diagfwd_disconnect_sdio(void);
+int diagfwd_read_complete_sdio(void);
+int diagfwd_write_complete_sdio(void);
 
 #endif

@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2010, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -8,15 +8,12 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
  */
 
-#ifndef DIAGMEM_H
-#define DIAGMEM_H
-#include "diagchar.h"
+#ifndef __F_RMNET_H
+#define __F_RMNET_H
 
-void *diagmem_alloc(struct diagchar_dev *driver, int size, int pool_type);
-void diagmem_free(struct diagchar_dev *driver, void *buf, int pool_type);
-void diagmem_init(struct diagchar_dev *driver);
-void diagmem_exit(struct diagchar_dev *driver, int pool_type);
+int rmnet_function_add(struct usb_configuration *c);
 
-#endif
+#endif /* __F_RMNET_H */
