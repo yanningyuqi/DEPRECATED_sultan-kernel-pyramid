@@ -81,13 +81,14 @@
 
 
 /* ION Memory map */
-#define MSM_ION_HEAP_NUM      3
+#define MSM_ION_HEAP_NUM      4
 
 #define MSM_PMEM_ADSP_SIZE    0x1800000
 #define MSM_PMEM_AUDIO_SIZE   0x239000
 
 #define MSM_ION_SF_SIZE       0x29A0000
 #define MSM_ION_WB_SIZE       0x2FD000  /* MSM_OVERLAY_BLT_SIZE */
+#define MSM_ION_MM_SIZE       0x3000000
 
 #define MSM_ION_SF_BASE       (0x40400000)
 #define MSM_ION_WB_BASE       (0x45C00000)
