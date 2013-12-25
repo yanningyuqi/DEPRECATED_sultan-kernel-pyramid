@@ -167,8 +167,6 @@ int set_three_phase_freq_badass(int cpufreq);
 #define PM8901_IRQ_BASE				(PM8058_IRQ_BASE + \
 						NR_PMIC8058_IRQS)
 
-int __init pyd_init_panel(struct resource *res, size_t size);
-
 enum {
 	GPIO_EXPANDER_IRQ_BASE  = PM8901_IRQ_BASE + NR_PMIC8901_IRQS,
 	GPIO_EXPANDER_GPIO_BASE = PM8901_GPIO_BASE + PM8901_MPPS,
@@ -1887,14 +1885,6 @@ static struct platform_device msm_batt_device = {
 };
 #endif
 
-static unsigned fb_size;
-static int __init fb_size_setup(char *p)
-{
-	fb_size = memparse(p, NULL);
-	return 0;
-}
-early_param("fb_size", fb_size_setup);
-
 #ifdef CONFIG_ANDROID_PMEM
 static unsigned pmem_adsp_size = MSM_PMEM_ADSP_SIZE;
 
@@ -1915,16 +1905,6 @@ static int __init pmem_audio_size_setup(char *p)
 early_param("pmem_audio_size", pmem_audio_size_setup);
 #endif
 
-static struct resource msm_fb_resources[] = {
-	{
-		.flags  = IORESOURCE_DMA,
-	},
-	/* for overlay write back operation */
-	{
-		.flags  = IORESOURCE_DMA,
-	},
-};
-
 #ifdef CONFIG_ANDROID_PMEM
 static struct android_pmem_platform_data android_pmem_adsp_pdata = {
 	.name = "pmem_adsp",
@@ -1937,6 +1917,11 @@ static struct platform_device android_pmem_adsp_device = {
 	.id = 2,
 	.dev = { .platform_data = &android_pmem_adsp_pdata },
 };
+
+static void __init reserve_mdp_memory(void)
+{
+pyramid_mdp_writeback();
+}
 
 static struct android_pmem_platform_data android_pmem_audio_pdata = {
 	.name = "pmem_audio",
@@ -2135,23 +2120,7 @@ static struct platform_device android_pmem_smipool_device = {
 
 static void __init msm8x60_allocate_memory_regions(void)
 {
-	void *addr;
-	unsigned long size;
-
-	size = MSM_FB_SIZE;
-	addr = alloc_bootmem_align(size, 0x1000);
-	msm_fb_resources[0].start = __pa(addr);
-	msm_fb_resources[0].end = msm_fb_resources[0].start + size - 1;
-	pr_info("allocating %lu bytes at %p (%lx physical) for fb\n",
-			size, addr, __pa(addr));
-
-#ifdef CONFIG_FB_MSM_OVERLAY_WRITEBACK
-	size = MSM_FB_WRITEBACK_SIZE;
-	msm_fb_resources[1].start = MSM_FB_WRITEBACK_BASE;
-	msm_fb_resources[1].end = msm_fb_resources[1].start + size - 1;
-	pr_info("allocating %lu bytes at 0x%p (0x%lx physical) for overlay\n",
-		size, __va(MSM_FB_WRITEBACK_BASE), (unsigned long) MSM_FB_WRITEBACK_BASE);
-#endif
+	pyramid_allocate_fb_region();
 }
 
 static int pyramid_ts_cy8c_set_rst(int on)
@@ -2375,6 +2344,9 @@ static struct platform_device pyramid_rfkill = {
 	.id = -1,
 };
 #endif
+
+
+
 
 #if defined(CONFIG_MSM_RPM_LOG) || defined(CONFIG_MSM_RPM_LOG_MODULE)
 
@@ -3570,6 +3542,8 @@ static void __init reserve_pmem_memory(void)
 #endif
 }
 
+static void __init reserve_mdp_memory(void);
+
 static void __init msm8x60_calculate_reserve_sizes(void)
 {
 	size_pmem_devices();
@@ -3577,6 +3551,7 @@ static void __init msm8x60_calculate_reserve_sizes(void)
 #ifdef CONFIG_ION_MSM
 	reserve_ion_memory();
 #endif
+	reserve_mdp_memory();
 }
 
 static int msm8x60_paddr_to_memtype(phys_addr_t paddr)
@@ -4680,7 +4655,6 @@ static struct i2c_board_info i2c_isl29029_devices[] = {
 	},
 };
 
-
 static struct mpu3050_platform_data mpu3050_data = {
 	.int_config = 0x10,
 	.orientation = { -1, 0, 0,
@@ -4738,7 +4712,6 @@ static struct mpu3050_platform_data mpu3050_data_XB = {
 							0, 0, -1 },
 	},
 };
-
 
 static struct i2c_board_info __initdata mpu3050_GSBI10_boardinfo[] = {
 	{
@@ -4821,7 +4794,6 @@ static struct i2c_registry msm8x60_i2c_devices[] __initdata = {
 		msm_i2c_gsbi7_mhl_sii9234_info,
 		ARRAY_SIZE(msm_i2c_gsbi7_mhl_sii9234_info),
 	},
-
 #endif
 #endif
 	{
@@ -5711,7 +5683,6 @@ static uint32_t msm_rpm_get_swfi_latency(void)
 static unsigned int pyramid_emmcslot_type = MMC_TYPE_MMC;
 static struct mmc_platform_data msm8x60_sdc1_data = {
 	.ocr_mask       = MMC_VDD_27_28 | MMC_VDD_28_29,
-	/*.translate_vdd  = msm_sdcc_setup_power,*/
 #ifdef CONFIG_MMC_MSM_SDC1_8_BIT_SUPPORT
 	.mmc_bus_width  = MMC_CAP_8_BIT_DATA,
 #else
@@ -6350,7 +6321,7 @@ static void __init msm8x60_init(struct msm_board_data *board_data)
 	platform_device_register(&msm_gsbi1_qup_spi_device);
 #endif
 
-	pyd_init_panel(msm_fb_resources, ARRAY_SIZE(msm_fb_resources));
+	pyramid_init_fb();
 	pyramid_ts_cy8c_set_system_rev(system_rev);
 	fixup_i2c_configs();
 	register_i2c_devices();

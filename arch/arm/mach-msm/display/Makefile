@@ -1,6 +1,4 @@
-ccflags-y := -O2 -fsingle-precision-constant -mtune=cortex-a8 -marm -march=armv7-a -mfpu=neon -ftree-vectorize -mvectorize-with-neon-double
 
-obj-$(CONFIG_MACH_PYRAMID) += pyramid-panel.o
 obj-$(CONFIG_MACH_SHOOTER) += shooter-panel.o
 obj-$(CONFIG_MACH_SHOOTER_U) += shooter_u-panel.o
 obj-$(CONFIG_MACH_SHOOTER_K) += shooter_k-panel.o

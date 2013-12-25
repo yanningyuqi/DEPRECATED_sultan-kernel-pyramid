@@ -2,7 +2,9 @@
  *
  * Copyright (C) 2010-2011 HTC Corporation.
  *
- * 2013 - Memory remapped by Sultanxda (android1234567)
+ * Copyright (c) 2013 Sultanxda <sultanxda@gmail.com>
+ * Copyright (c) 2013 Sebastian Sobczyk <sebastiansobczyk@wp.pl>
+ * Copyright (c) 2013 bilalliberty <dominos_liberty @ xda-developers>
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -32,34 +34,8 @@
 #define QCE_0_BASE		0x18500000
 #endif
 
-#ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
-#define MSM_FB_PRIM_BUF_SIZE \
-		(roundup((960 * 540 * 4), 4096) * 3) /* 4 bpp x 3 pages */ /*0x5F1000*/
-#else
-#define MSM_FB_PRIM_BUF_SIZE \
-		(roundup((960 * 540 * 4), 4096) * 2) /* 4 bpp x 2 pages */ /*0x3F6000*/
-#endif
-
-#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
-#define MSM_FB_EXT_BUF_SIZE  \
-		(roundup((1920 * 1080 * 2), 4096) * 1) /* 2 bpp x 1 page */ /*0x3F5000*/
-#else
-#define MSM_FB_EXT_BUF_SIZE	0
-#endif
-
-#ifdef CONFIG_FB_MSM_OVERLAY_WRITEBACK
-/* width x height x 3 bpp x 2 frame buffer */
-#define MSM_FB_WRITEBACK_SIZE 0x2F8000 /*roundup((960 * 540 * 3 * 2), 4096)*/
-#define MSM_FB_WRITEBACK_OFFSET 0
-#else
-#define MSM_FB_WRITEBACK_SIZE   0
-#define MSM_FB_WRITEBACK_OFFSET 0
-#endif
-
 /*** Memory map ***/
 #define MSM_ION_HEAP_NUM      4
-
-#define MSM_FB_SIZE	      0x6F0000
 
 // PMEM SMI
 #define MSM_SMI_SIZE          0x4000000
@@ -127,6 +103,7 @@
 #define GPIO_LCM_RST_N			(66)
 #define GPIO_LCM_ID			(50)
 
+#define GPIO_LCD_TE        (28)
 /* Audio */
 #define PYRAMID_AUD_CODEC_RST        (67)
 
@@ -189,10 +166,14 @@
 #define PYRAMID_AUD_REMO_PRES      PMGPIO(37)
 #define PYRAMID_WIFI_BT_SLEEP_CLK  PMGPIO(38)
 
+extern int panel_type;
 
 int __init pyramid_init_mmc(void);
 void __init pyramid_audio_init(void);
 int __init pyramid_init_keypad(void);
 int __init pyramid_wifi_init(void);
-
+void pyramid_init_fb(void);
+void pyramid_allocate_fb_region(void);
+void pyramid_mdp_writeback(void);
+void __init msm_fb_add_devices(void);
 #endif /* __ARCH_ARM_MACH_MSM_BOARD_PYRAMID_H */

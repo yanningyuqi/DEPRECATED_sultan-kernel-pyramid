@@ -399,6 +399,9 @@ struct msm_panel_common_pdata {
 	struct msm_bus_scale_pdata *mdp_bus_scale_table;
 #endif
 	int mdp_rev;
+	u32 ov0_wb_size;  /* overlay0 writeback size */
+	u32 ov1_wb_size;  /* overlay1 writeback size */
+	u32 mem_hid;
 	int (*writeback_offset)(void);
 	int (*mdp_color_enhance)(void);
 	int (*mdp_gamma)(void);
@@ -408,18 +411,22 @@ struct msm_panel_common_pdata {
 	struct panel_dcr_info *dcr_panel_pinfo;
 	unsigned int auto_bkl_stat;
 	int (*bkl_enable)(int);
+	char cont_splash_enabled;
+#ifdef CONFIG_FB_MSM8960
+	int (*acl_enable)(int);
+#else
 	int fpga_3d_config_addr;
 	struct gamma_curvy *abl_gamma_tbl;
-	struct mdp_reg *color_enhancment_tbl;
+#endif
 };
 
 struct lcdc_platform_data {
 	int (*lcdc_gpio_config)(int on);
 	int (*lcdc_power_save)(int);
 	unsigned int (*lcdc_get_clk)(void);
-#ifdef CONFIG_MSM_BUS_SCALING
+
 	struct msm_bus_scale_pdata *bus_scale_table;
-#endif
+
 };
 
 struct tvenc_platform_data {
@@ -450,8 +457,7 @@ enum mipi_dsi_3d_ctrl {
 	FPGA_SPI_INTF,
 };
 
-#ifndef CONFIG_ARCH_MSM8X60
-#ifndef CONFIG_ARCH_MSM7X27A
+
 /* DSI PHY configuration */
 struct mipi_dsi_phy_ctrl {
 	uint32_t regulator[5];
@@ -460,8 +466,7 @@ struct mipi_dsi_phy_ctrl {
 	uint32_t strength[4];
 	uint32_t pll[21];
 };
-#endif
-#endif
+
 
 struct mipi_dsi_panel_platform_data {
 	int fpga_ctrl_mode;
@@ -469,6 +474,9 @@ struct mipi_dsi_panel_platform_data {
 	int *gpio;
 	struct mipi_dsi_phy_ctrl *phy_ctrl_settings;
 };
+
+
+#define PANEL_NAME_MAX_LEN 50
 
 struct msm_fb_platform_data {
 	int (*detect_client)(const char *name);
@@ -478,7 +486,27 @@ struct msm_fb_platform_data {
 	uint32_t width;
 	uint32_t height;
 	bool     is_3d_panel;
+#ifdef CONFIG_ARCH_MSM7X27A
+	char prim_panel_name[PANEL_NAME_MAX_LEN];
+	char ext_panel_name[PANEL_NAME_MAX_LEN];
+#endif
 };
+
+
+#define HDMI_VFRMT_640x480p60_4_3 0
+#define HDMI_VFRMT_720x480p60_16_9 2
+#define HDMI_VFRMT_1280x720p60_16_9 3
+#define HDMI_VFRMT_720x576p50_16_9 17
+#define HDMI_VFRMT_1920x1080p24_16_9 31
+#define HDMI_VFRMT_1920x1080p30_16_9 33
+
+typedef struct
+{
+	uint8_t format;
+	uint8_t reg_a3;
+	uint8_t reg_a6;
+}mhl_driving_params;
+
 
 struct msm_hdmi_platform_data {
 	int irq;
@@ -489,6 +517,10 @@ struct msm_hdmi_platform_data {
 	int (*cec_power)(int on);
 	int (*init_irq)(void);
 	bool (*check_hdcp_hw_support)(void);
+
+	mhl_driving_params *driving_params;
+	int dirving_params_count;
+
 };
 
 struct msm_i2c_platform_data {
