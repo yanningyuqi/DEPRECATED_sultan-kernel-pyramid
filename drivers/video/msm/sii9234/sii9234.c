@@ -26,15 +26,22 @@
 #include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/input.h>
+#include <linux/input/mt.h>
 #include <linux/slab.h>
 #include <asm/setup.h>
 #include <linux/wakelock.h>
 #include <mach/mhl.h>
 #include <mach/debug_display.h>
 #include <mach/board.h>
+#include <linux/module.h>
+#include <linux/debugfs.h>
+#include <linux/types.h>
+#include <mach/cable_detect.h>
+
 #include "sii9234.h"
 #include "TPI.h"
 #include "mhl_defs.h"
+
 
 /*********************************************************************
   Define & Macro
@@ -50,9 +57,13 @@ typedef struct {
 	int (*pwrCtrl)(int); /* power to the chip */
 	void (*mhl_usb_switch)(int);
 	void (*mhl_1v2_power)(bool enable);
+	int  (*mhl_power_vote)(bool enable);
+	int (*enable_5v)(int on);
 	struct delayed_work init_delay_work;
 	struct delayed_work init_complete_work;
+	struct delayed_work irq_timeout_work;
 	struct delayed_work mhl_on_delay_work;
+	struct delayed_work turn_off_5v;
 #ifdef CONFIG_INTERNAL_CHARGING_SUPPORT
 	struct delayed_work detect_charger_work;
 #endif
@@ -67,10 +78,32 @@ typedef struct {
 	enum usb_connect_type statMHL;
 	struct work_struct mhl_notifier_work;
 	mhl_board_params board_params;
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SUPERDEMO
+	struct input_dev *input_dev;
+	int abs_x_min;
+	int abs_x_max;
+	int abs_y_min;
+	int abs_y_max;
+	int abs_pressure_min;
+	int abs_pressure_max;
+	int abs_width_min;
+	int abs_width_max;
+	uint16_t finger_count;
+	T_MHL_REMOTE_FINGER_DATA *finger_data;
+	T_MHL_REMOTE_KEY_DATA *key_data;
+#endif
 } T_MHL_SII9234_INFO;
-int TPI_SLAVE_ADDR;
-int HDMI_SLAVE_ADDR;
-int CBUS_SLAVE_ADDR;
+
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SUPERDEMO
+/*
+ * For now there is no touch, width, and pressure data sent from TV.
+ * Thus we use fixed value here.
+ */
+#define DEMOTV_DEFAULT_WIDTH 50/*20*/
+#define DEMOTV_DEFAULT_TOUCH 5/*15*/
+#define DEMOTV_DEFAULT_PRESSURE 5/*15*/
+#endif
+
 /*********************************************************************
    Variable & Extern variable
 **********************************************************************/
@@ -82,23 +115,37 @@ static void sii9234_irq_do_work(struct work_struct *work);
 static DECLARE_WORK(sii9234_irq_work, sii9234_irq_do_work);
 
 static DEFINE_MUTEX(mhl_early_suspend_sem);
+unsigned long suspend_jiffies;
+unsigned long irq_jiffies;
 bool g_bEnterEarlySuspend = false;
-static bool g_bGotUsbBus = false;
-static bool g_bNeedSimulateCableOut = false;
+bool g_bProbe = false;
+bool mhl_wakeuped = false;
 static bool g_bInitCompleted = false;
 static bool sii9244_interruptable = false;
-static bool sii9244_iswakup = false;
+static bool need_simulate_cable_out = false;
 #ifdef CONFIG_INTERNAL_CHARGING_SUPPORT
 static bool g_bPollDetect = false;
+int htc_batt_turn_off_mhl_dongle_5v(void);
 #endif
+static struct dentry *dbg_entry_dir, *dbg_entry_a3, *dbg_entry_dbg_on;
+u8 dbg_drv_str_a3 = 0xEB, dbg_drv_str_on = 0;
 
 #define MHL_RCP_KEYEVENT
+#define MHL_ISR_TIMEOUT 5
 
 #ifdef MHL_RCP_KEYEVENT
 struct input_dev *input_dev;
 #endif
 static struct platform_device *mhl_dev; /* Device structure */
 
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SUPERDEMO
+static T_MHL_REMOTE_FINGER_DATA g_mhl_finger_data[2];
+static T_MHL_REMOTE_KEY_DATA g_mhl_key_data;
+static bool g_back_key_pressed = false;
+static bool g_touch_pressed[MHL_SII9234_TOUCH_FINGER_NUM_MAX] = {false};
+static void Mhl_Proc_Remote_Event(T_MHL_SII9234_INFO *pInfo);
+static void Mhl_Proc_Reset_Key_Status(void);
+#endif
 /*********************************************************************
 	Functions
 **********************************************************************/
@@ -121,7 +168,19 @@ static void detect_charger_handler(struct work_struct *w)
 	queue_delayed_work(pInfo->wq, &pInfo->detect_charger_work, HZ*2);
 }
 #endif
-
+#ifdef CONFIG_INTERNAL_CHARGING_SUPPORT
+void check_mhl_5v_status(void)
+{
+	T_MHL_SII9234_INFO *pInfo = sii9234_info_ptr;
+	/*
+		for the case of (1)plug dongle +AC +HDMI  (2)remove HDMI (3) plug HDMI,
+		we should turn off internal 5v in this case step3
+	*/
+	if(pInfo->isMHL && (pInfo->statMHL == CONNECT_TYPE_AC || pInfo->statMHL == CONNECT_TYPE_USB )){
+		htc_batt_turn_off_mhl_dongle_5v();
+	}
+}
+#endif
 void update_mhl_status(bool isMHL, enum usb_connect_type statMHL)
 {
 	T_MHL_SII9234_INFO *pInfo = sii9234_info_ptr;
@@ -134,16 +193,28 @@ void update_mhl_status(bool isMHL, enum usb_connect_type statMHL)
 	queue_work(pInfo->wq, &pInfo->mhl_notifier_work);
 
 #ifdef CONFIG_INTERNAL_CHARGING_SUPPORT
-	if (isMHL && statMHL == CONNECT_TYPE_INTERNAL) {
+	if (isMHL && (statMHL == CONNECT_TYPE_INTERNAL)) {
 		if (!g_bPollDetect) {
 			g_bPollDetect = true;
 			queue_delayed_work(pInfo->wq, &pInfo->detect_charger_work, HZ/2);
+			cancel_delayed_work(&pInfo->turn_off_5v);
 		}
-	} else {
+	} else if (statMHL == CONNECT_TYPE_AC || statMHL == CONNECT_TYPE_USB) {
+		cancel_delayed_work(&pInfo->detect_charger_work);
+		g_bPollDetect = false;
+		/*disable boost 5v after 1 second*/
+		queue_delayed_work(pInfo->wq, &pInfo->turn_off_5v, HZ);
+	}
+	else {
 		g_bPollDetect = false;
 		cancel_delayed_work(&pInfo->detect_charger_work);
 	}
 #endif
+
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SUPERDEMO
+	Mhl_Proc_Reset_Key_Status();
+#endif
+
 }
 
 static void send_mhl_connect_notify(struct work_struct *w)
@@ -268,6 +339,102 @@ int sii9234_get_ci2ca(void)
 	return pInfo->ci2ca_pin;
 }
 
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SUPERDEMO
+static void Mhl_Proc_Remote_Event(T_MHL_SII9234_INFO *pInfo)
+{
+	uint16_t evt_type = E_MHL_EVT_UNKNOWN;
+	int remote_evt_en = E_MHL_FALSE;
+	uint8_t i;
+	int x, y, z;
+	static int prev_x[MHL_SII9234_TOUCH_FINGER_NUM_MAX] = { -1 };
+	static int prev_y[MHL_SII9234_TOUCH_FINGER_NUM_MAX] = { -1 };
+
+	remote_evt_en = Tpi_query_remote_type(&evt_type);
+	if (remote_evt_en == E_MHL_FALSE)
+		return;
+
+	Tpi_reset_remote_intr();
+	switch (evt_type) {
+	case E_MHL_EVT_REMOTE_KEY:
+		pInfo->key_data = &g_mhl_key_data;
+		Tpi_query_remote_keyInfo(pInfo->key_data);
+		if (pInfo->key_data->keyCode == KEY_BACK)
+			g_back_key_pressed = true;
+		input_report_key(pInfo->input_dev, pInfo->key_data->keyCode, 1);
+		input_sync(pInfo->input_dev);
+		break;
+	case E_MHL_EVT_REMOTE_KEY_RELEASE:
+		pInfo->key_data = &g_mhl_key_data;
+		Tpi_query_remote_keyInfo(pInfo->key_data);
+		if (pInfo->key_data->keyCode == KEY_BACK)
+			g_back_key_pressed = false;
+		input_report_key(pInfo->input_dev, pInfo->key_data->keyCode, 0);
+		input_sync(pInfo->input_dev);
+		break;
+	case E_MHL_EVT_REMOTE_TOUCH:
+		pInfo->finger_count = 0;
+		pInfo->finger_data = g_mhl_finger_data;
+		Tpi_query_remote_touchInfo(&(pInfo)->finger_count, pInfo->finger_data);
+		for (i = 0; (i < pInfo->finger_count) && (i < MHL_SII9234_TOUCH_FINGER_NUM_MAX); i++) {
+			z = pInfo->finger_data[i].z;
+			if (z == E_MHL_EVT_REMOTE_TOUCH_PRESS) {
+				g_touch_pressed[i] = true;
+				x = pInfo->finger_data[i].x;
+				y = pInfo->finger_data[i].y;
+				/* don't send the same position */
+				if (x != prev_x[i] || y != prev_y[i]) {
+					prev_x[i] = x;
+					prev_y[i] = y;
+					input_report_abs(pInfo->input_dev, ABS_MT_PRESSURE, DEMOTV_DEFAULT_PRESSURE);
+					input_report_abs(pInfo->input_dev, ABS_MT_TOUCH_MAJOR, DEMOTV_DEFAULT_TOUCH);
+					input_report_abs(pInfo->input_dev, ABS_MT_WIDTH_MAJOR, DEMOTV_DEFAULT_WIDTH);
+					input_report_abs(pInfo->input_dev, ABS_MT_POSITION_X, x);
+					input_report_abs(pInfo->input_dev, ABS_MT_POSITION_Y, y);
+					input_mt_sync(pInfo->input_dev);
+				}
+			} else if (z == E_MHL_EVT_REMOTE_TOUCH_RELEASE) {
+				g_touch_pressed[i] = false;
+				prev_x[i] = -1;
+				prev_y[i] = -1;
+				input_mt_sync(pInfo->input_dev);
+			}
+		}
+		/* Type-A: after all the fingers are processed */
+		input_sync(pInfo->input_dev);
+		break;
+	default:
+		M_MHL_SEND_DEBUG("[Err]: MHL ISR invalid event = %d\r\n", evt_type);
+		break;
+	}
+
+	/* add this sleep to prevent interrupt flood */
+	hr_msleep(1);
+}
+
+void Mhl_Proc_Reset_Key_Status(void)
+{
+	int i;
+	T_MHL_SII9234_INFO *pInfo = sii9234_info_ptr;
+
+	if (g_back_key_pressed) {
+		PR_DISP_INFO("MHL disconnected. Released back key from TV!\n");
+		g_back_key_pressed = false;
+		input_report_key(pInfo->input_dev, KEY_BACK, 0);
+		input_sync(pInfo->input_dev);
+	}
+
+	for (i = 0; i < MHL_SII9234_TOUCH_FINGER_NUM_MAX; i++) {
+		if (g_touch_pressed[i]) {
+			PR_DISP_INFO("MHL disconnected. Released finger %d from TV!\n", i);
+			g_touch_pressed[i] = false;
+			input_report_abs(pInfo->input_dev, ABS_MT_AMPLITUDE, 0);
+			input_report_abs(pInfo->input_dev, ABS_MT_POSITION, 1 << 31);
+		}
+	}
+
+}
+#endif
+
 static void sii9234_irq_do_work(struct work_struct *work)
 {
 	T_MHL_SII9234_INFO *pInfo = sii9234_info_ptr;
@@ -276,10 +443,18 @@ static void sii9234_irq_do_work(struct work_struct *work)
 	if (!g_bEnterEarlySuspend) {
 		uint8_t		event;
 		uint8_t		eventParameter;
-
-		PR_DISP_DEBUG("MHL ISR\n");
-		SiiMhlTxGetEvents(&event, &eventParameter);
-		ProcessRcp(event, eventParameter);
+		if(time_after(jiffies, irq_jiffies + HZ/20))
+		{
+			irq_jiffies = jiffies;
+			/*PR_DISP_DEBUG("MHL ISR\n");*/
+			need_simulate_cable_out = false;
+			cancel_delayed_work(&pInfo->irq_timeout_work);
+			SiiMhlTxGetEvents(&event, &eventParameter);
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SUPERDEMO
+			Mhl_Proc_Remote_Event(pInfo);
+#endif
+			ProcessRcp(event, eventParameter);
+		}
 	}
 	mutex_unlock(&mhl_early_suspend_sem);
 
@@ -289,11 +464,24 @@ static void sii9234_irq_do_work(struct work_struct *work)
 void sii9234_disableIRQ(void)
 {
 	T_MHL_SII9234_INFO *pInfo = sii9234_info_ptr;
+	cancel_work_sync(&sii9234_irq_work);
 	if (sii9244_interruptable) {
 		PR_DISP_DEBUG("%s\n", __func__);
 		disable_irq_nosync(pInfo->irq);
 		sii9244_interruptable = false;
 	}
+}
+
+int sii9234_power_vote(bool enable)
+{
+	T_MHL_SII9234_INFO *pInfo = sii9234_info_ptr;
+	if (pInfo->mhl_power_vote) {
+		if (enable)
+			pInfo->mhl_power_vote(1);
+		else
+			pInfo->mhl_power_vote(0);
+	}
+	return 0;
 }
 
 static irqreturn_t sii9234_irq_handler(int irq, void *data)
@@ -381,10 +569,11 @@ static DEVICE_ATTR(rcp_event, 0644, NULL, write_keyevent);
 void sii9234_mhl_device_wakeup(void)
 {
 	int err;
+	int ret = 0 ;
+
 	T_MHL_SII9234_INFO *pInfo = sii9234_info_ptr;
 
 	PR_DISP_INFO("sii9234_mhl_device_wakeup()\n");
-	sii9244_iswakup = true;
 
 	if (!g_bInitCompleted) {
 		PR_DISP_INFO("MHL inserted before HDMI related function was ready! Wait more 5 sec...\n");
@@ -401,15 +590,35 @@ void sii9234_mhl_device_wakeup(void)
 	if (pInfo->mhl_1v2_power)
 		pInfo->mhl_1v2_power(1);
 
-	err = TPI_Init(sii9234_info_ptr->board_params);
+	err = TPI_Init();
 	if (err != 1)
 		PR_DISP_INFO("TPI can't init\n");
 
-	if (!sii9244_interruptable) {
-		PR_DISP_INFO("Enable Sii9244 IRQ\n");
+	sii9244_interruptable = true;
+	PR_DISP_INFO("Enable Sii9244 IRQ\n");
+
+	/*request irq pin again, for solving MHL_INT is captured to INUT LOW*/
+	if(mhl_wakeuped) {
+		disable_irq_nosync(pInfo->irq);
+		free_irq(pInfo->irq, pInfo);
+
+		ret = request_irq(pInfo->irq, sii9234_irq_handler, IRQF_TRIGGER_LOW, "mhl_sii9234_evt", pInfo);
+		if (ret < 0) {
+			PR_DISP_DEBUG("%s: request_irq(%d) failed for gpio %d (%d)\n",
+				__func__, pInfo->irq, pInfo->intr_pin, ret);
+			ret = -EIO;
+		}
+	} else
 		enable_irq(pInfo->irq);
-		sii9244_interruptable = true;
-	}
+
+	mhl_wakeuped = true;
+
+	/*switch to D0, we now depends on Sii9244 to detect the connection by MHL interrupt*/
+	/*if there is no IRQ in the following steps , the status of connect will be in-correct and cannot be recovered*/
+	/*add a mechanism to simulate cable out to prevent this case.*/
+	need_simulate_cable_out = true;
+	queue_delayed_work(pInfo->wq, &pInfo->irq_timeout_work, HZ * MHL_ISR_TIMEOUT);
+
 }
 
 static void init_delay_handler(struct work_struct *w)
@@ -422,17 +631,30 @@ static void init_delay_handler(struct work_struct *w)
 static void init_complete_handler(struct work_struct *w)
 {
 	PR_DISP_INFO("init_complete_handler()\n");
-
+	/*make sure the MHL is in sleep *& usb_bypass mode*/
+	TPI_Init();
 	g_bInitCompleted = true;
-
-	if (!sii9244_iswakup && IsD0Mode()) {
-		sii9244_iswakup = true;
-		PR_DISP_INFO("Force MHL reconnection() in booting\n");
-		TPI_Init(sii9234_info_ptr->board_params);
+}
+static void irq_timeout_handler(struct work_struct *w)
+{
+	if(need_simulate_cable_out) {
+		T_MHL_SII9234_INFO *pInfo = sii9234_info_ptr;
+		int ret = 0 ;
+		/*need to request_irq again on 8960 VLE, or this prevention is not working*/
+		PR_DISP_INFO("%s , There is no MHL ISR simulate cable out.\n", __func__);
+		disable_irq_nosync(pInfo->irq);
+		TPI_Init();
+		free_irq(pInfo->irq, pInfo);
+		ret = request_irq(pInfo->irq, sii9234_irq_handler, IRQF_TRIGGER_LOW, "mhl_sii9234_evt", pInfo);
+		if (ret < 0) {
+			PR_DISP_DEBUG("%s: request_irq(%d) failed for gpio %d (%d)\n",
+				__func__, pInfo->irq, pInfo->intr_pin, ret);
+			ret = -EIO;
+		}
+		enable_irq(pInfo->irq);
 		update_mhl_status(false, CONNECT_TYPE_UNKNOWN);
 	}
 }
-
 #ifdef CONFIG_HAS_EARLYSUSPEND
 static int sii9234_suspend(struct i2c_client *client, pm_message_t mesg)
 {
@@ -458,9 +680,7 @@ static int sii9234_resume(struct i2c_client *client)
 
 void sii9234_change_usb_owner(bool bMHL)
 {
-	PR_DISP_DEBUG("%s(%d)\n", __func__, bMHL);
 
-	g_bGotUsbBus = bMHL;
 }
 
 static void sii9234_early_suspend(struct early_suspend *h)
@@ -468,26 +688,48 @@ static void sii9234_early_suspend(struct early_suspend *h)
 	T_MHL_SII9234_INFO *pInfo;
 	pInfo = container_of(h, T_MHL_SII9234_INFO, early_suspend);
 
-	PR_DISP_DEBUG("%s(isMHL=%d, g_bGotUsbBus=%d)\n", __func__, pInfo->isMHL, g_bGotUsbBus);
+	PR_DISP_DEBUG("%s(isMHL=%d)\n", __func__, pInfo->isMHL);
 
 	mutex_lock(&mhl_early_suspend_sem);
+	/*if early_suspend get the mutex, disable irq for the case of mhl dongle plugged*/
+	/*for avoiding cancel_work_sync is blocked by this mutex in ISR*/
+	/*About resume flow in the case, we will re-init cable detection */
+	/*IRQ will enable in sii9234_mhl_device_wakeup(), Ville#C2 ITS#581*/
+	if(pInfo->isMHL)
+		sii9234_disableIRQ();
+
 	/* Enter the early suspend state...*/
 	g_bEnterEarlySuspend = true;
+	suspend_jiffies = jiffies;
 
 	/* Cancel the previous TMDS on delay work...*/
 	cancel_delayed_work(&pInfo->mhl_on_delay_work);
 	if (pInfo->isMHL) {
-		/* Power off the chip...*/
-		if (pInfo->mhl_1v2_power)
-			pInfo->mhl_1v2_power(0);
 
 		/* Turn-off the TMDS output...*/
 		sii9234_suspend(pInfo->i2c_client, PMSG_SUSPEND);
-	}
-	/* Check already power on or not?*/
-	if (g_bGotUsbBus) {
-		/* Got the USB bus owner, but didn't have time to make sure the connected device was MHL client?*/
-		g_bNeedSimulateCableOut = true;
+		/*For the case of dongle without HDMI cable*/
+
+		if(!tpi_get_hpd_state()){
+#ifdef CONFIG_INTERNAL_CHARGING_SUPPORT
+			cancel_delayed_work(&pInfo->detect_charger_work);
+#endif
+			if (pInfo->mhl_1v2_power)
+				pInfo->mhl_1v2_power(0);
+			/*follow suspend GPIO state,  disable hdmi HPD*/
+			if (pInfo->mhl_usb_switch)
+				pInfo->mhl_usb_switch(0);
+			/*D3 mode with internal switch in by-pass mode*/
+			TPI_Init();
+		} else {
+			if (pInfo->mhl_1v2_power)
+				pInfo->mhl_1v2_power(0);
+			enable_irq(pInfo->irq);
+		}
+		htc_batt_turn_off_mhl_dongle_5v();
+	} else {
+		/*in case cable_detect call D2ToD3(), make sure MHL chip is go Sleep mode correctly*/
+		TPI_Init();
 	}
 	mutex_unlock(&mhl_early_suspend_sem);
 }
@@ -505,34 +747,57 @@ static void sii9234_late_resume(struct early_suspend *h)
 	g_bEnterEarlySuspend = false;
 	mutex_unlock(&mhl_early_suspend_sem);
 }
-
+static void mhl_turn_off_5v(struct work_struct *w)
+{
+	htc_batt_turn_off_mhl_dongle_5v();
+}
 static void mhl_on_delay_handler(struct work_struct *w)
 {
 	T_MHL_SII9234_INFO *pInfo = sii9234_info_ptr;
-	PR_DISP_DEBUG("%s(%d, %d)\n", __func__, g_bEnterEarlySuspend, g_bNeedSimulateCableOut);
 
 	mutex_lock(&mhl_early_suspend_sem);
 	if (IsMHLConnection()) {
+		/*have HDMI cable on dongle*/
 		fill_black_screen();
-		g_bNeedSimulateCableOut = false;
 		sii9234_EnableTMDS();
-		PR_DISP_DEBUG("MHL has connected. No SimulateCableOut!!!\n");
+
 		if (pInfo->mhl_1v2_power)
 			pInfo->mhl_1v2_power(1);
+
+		PR_DISP_DEBUG("MHL has connected. No SimulateCableOut!!!\n");
 		mutex_unlock(&mhl_early_suspend_sem);
 		return;
 	}
-
-	if (!g_bEnterEarlySuspend && g_bNeedSimulateCableOut) {
-		/* Simulate the cable out to reinitiate the MHL...*/
-		/* update_mhl_status(false, CONNECT_TYPE_UNKNOWN);*/
-		/* Reset the variable...*/
-		g_bNeedSimulateCableOut = false;
-		g_bGotUsbBus = false;
+	else {
+		if(pInfo->isMHL){
+			/*MHL dongle plugged but no HDMI calbe*/
+			PR_DISP_DEBUG("notify cable out, re-init cable & mhl\n");
+			update_mhl_status(false, CONNECT_TYPE_UNKNOWN);
+			TPI_Init();
+		}
 	}
 	mutex_unlock(&mhl_early_suspend_sem);
 }
 #endif
+
+
+/*add debugfs for driving strength 0xA3*/
+static int sii_debugfs_init(void)
+{
+	dbg_entry_dir = debugfs_create_dir("mhl_debugfs", NULL);
+	if (!dbg_entry_dir) {
+		PR_DISP_DEBUG("Fail to create debugfs dir: mhl_debugfs\n");
+		return -1;
+	}
+	dbg_entry_a3 = debugfs_create_u8("strength", 0644, dbg_entry_dir, &dbg_drv_str_a3);
+	if (!dbg_entry_a3)
+		PR_DISP_DEBUG("Fail to create debugfs: strength\n");
+	dbg_entry_dbg_on = debugfs_create_u8("dbg_on", 0644, dbg_entry_dir, &dbg_drv_str_on);
+	if (!dbg_entry_dbg_on)
+		PR_DISP_DEBUG("Fail to create debugfs: dbg_on\n");
+
+	return 0;
+}
 
 static int sii9234_probe(struct i2c_client *client,
 	const struct i2c_device_id *id)
@@ -564,30 +829,27 @@ static int sii9234_probe(struct i2c_client *client,
 	pInfo->reset_pin = pdata->gpio_reset;
 	pInfo->intr_pin = pdata->gpio_intr;
 	pInfo->ci2ca_pin = pdata->ci2ca;
-	if (pInfo->ci2ca_pin) {
-		TPI_SLAVE_ADDR =  0x76;
-		HDMI_SLAVE_ADDR = 0x96;
-		CBUS_SLAVE_ADDR = 0xCC;
-	} else {
-		TPI_SLAVE_ADDR =  0x72;
-		HDMI_SLAVE_ADDR = 0x92;
-		CBUS_SLAVE_ADDR = 0xC8;
-	}
+
 	pInfo->pwrCtrl = pdata->power;
 	pInfo->mhl_usb_switch = pdata->mhl_usb_switch;
 	pInfo->mhl_1v2_power = pdata->mhl_1v2_power;
-	pInfo->board_params = pdata->board_params;
+	pInfo->mhl_power_vote = pdata->mhl_power_vote;
+	pInfo->enable_5v = pdata->enable_5v;
 	sii9234_info_ptr = pInfo;
+	/*making sure TPI_INIT() is working fine with pInfo*/
+	g_bProbe = true;
 	/* Power ON */
 	if (pInfo->pwrCtrl)
 		pInfo->pwrCtrl(1);
-	sii9244_iswakup = false;
+	if(board_build_flag() != SHIP_BUILD)
+		sii_debugfs_init();
+
 	/* Pin Config */
 	gpio_request(pInfo->reset_pin, "mhl_sii9234_gpio_reset");
 	gpio_direction_output(pInfo->reset_pin, 0);
 	gpio_request(pInfo->intr_pin, "mhl_sii9234_gpio_intr");
 	gpio_direction_input(pInfo->intr_pin);
-	rv = TPI_Init(sii9234_info_ptr->board_params);
+	rv = TPI_Init();
 	if (rv != TRUE) {
 		PR_DISP_DEBUG("%s: can't init\n", __func__);
 		ret = -ENOMEM;
@@ -596,12 +858,15 @@ static int sii9234_probe(struct i2c_client *client,
 
 	INIT_DELAYED_WORK(&pInfo->init_delay_work, init_delay_handler);
 	INIT_DELAYED_WORK(&pInfo->init_complete_work, init_complete_handler);
+	INIT_DELAYED_WORK(&pInfo->irq_timeout_work, irq_timeout_handler);
 	INIT_DELAYED_WORK(&pInfo->mhl_on_delay_work, mhl_on_delay_handler);
+	INIT_DELAYED_WORK(&pInfo->turn_off_5v, mhl_turn_off_5v);
 
 #ifdef CONFIG_INTERNAL_CHARGING_SUPPORT
 	INIT_DELAYED_WORK(&pInfo->detect_charger_work, detect_charger_handler);
 #endif
-
+	irq_jiffies = jiffies;
+	//pInfo->irq = gpio_to_irq(pInfo->irq); //8x60 does not need it, or it will reboot.
 	ret = request_irq(pInfo->irq, sii9234_irq_handler, IRQF_TRIGGER_LOW, "mhl_sii9234_evt", pInfo);
 	if (ret < 0) {
 		PR_DISP_DEBUG("%s: request_irq(%d) failed for gpio %d (%d)\n",
@@ -609,7 +874,8 @@ static int sii9234_probe(struct i2c_client *client,
 		ret = -EIO;
 		goto err_request_intr_pin;
 	}
-		sii9244_interruptable = true;
+	disable_irq_nosync(pInfo->irq);
+	sii9244_interruptable = false;
 
 	pInfo->wq = create_workqueue("mhl_sii9234_wq");
 	if (!pInfo->wq) {
@@ -653,6 +919,11 @@ static int sii9234_probe(struct i2c_client *client,
 	set_bit(KEY_UP, input_dev->keybit);
 	set_bit(KEY_DOWN, input_dev->keybit);
 	set_bit(KEY_RIGHT, input_dev->keybit);
+	set_bit(KEY_PLAY, input_dev->keybit);
+	set_bit(KEY_STOP, input_dev->keybit);
+	set_bit(KEY_PLAYPAUSE, input_dev->keybit);
+	set_bit(KEY_REWIND, input_dev->keybit);
+	set_bit(KEY_FASTFORWARD, input_dev->keybit);
 
 	input_dev->name = "rcp_events";
 
@@ -661,12 +932,57 @@ static int sii9234_probe(struct i2c_client *client,
 		PR_DISP_DEBUG("MHL: can't register input devce\n");
 #endif
 
-	/* Initiate a 10 sec delay which will change the "g_bInitCompleted" be true after it...*/
-	queue_delayed_work(pInfo->wq, &pInfo->init_complete_work, HZ*10);
+	/* Initiate a 5 sec delay which will change the "g_bInitCompleted" be true after it...*/
+	queue_delayed_work(pInfo->wq, &pInfo->init_complete_work, HZ*5);
+
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SUPERDEMO
+	pInfo->input_dev = input_allocate_device();
+	if (pInfo->input_dev == NULL) {
+		ret = -ENOMEM;
+		printk(KERN_INFO "Failed to allocate input device\n");
+		goto err_input_dev_alloc_failed;
+	}
+	pInfo->input_dev->name = "tv-touchscreen";
+	set_bit(EV_SYN, pInfo->input_dev->evbit);
+	set_bit(EV_ABS, pInfo->input_dev->evbit);
+	set_bit(EV_KEY, pInfo->input_dev->evbit);
+	set_bit(KEY_BACK, pInfo->input_dev->keybit);
+	set_bit(KEY_HOME, pInfo->input_dev->keybit);
+	set_bit(KEY_MENU, pInfo->input_dev->keybit);
+	set_bit(KEY_SEARCH, pInfo->input_dev->keybit);
+	set_bit(KEY_APP_SWITCH, pInfo->input_dev->keybit);
+
+	printk(KERN_INFO "input_set_abs_params: mix_x %d, max_x %d, min_y %d, max_y %d\n",
+			pdata->abs_x_min, pdata->abs_x_max, pdata->abs_y_min, pdata->abs_y_max);
+
+	input_set_abs_params(pInfo->input_dev, ABS_MT_POSITION_X,
+		pdata->abs_x_min, pdata->abs_x_max, 0, 0);
+	input_set_abs_params(pInfo->input_dev, ABS_MT_POSITION_Y,
+		pdata->abs_y_min, pdata->abs_y_max, 0, 0);
+	input_set_abs_params(pInfo->input_dev, ABS_MT_TOUCH_MAJOR,
+		pdata->abs_width_min, pdata->abs_width_max, 0, 0);
+	input_set_abs_params(pInfo->input_dev, ABS_MT_WIDTH_MAJOR,
+		pdata->abs_width_min, pdata->abs_width_max, 0, 0);
+	input_set_abs_params(pInfo->input_dev, ABS_MT_PRESSURE,
+		pdata->abs_pressure_min, pdata->abs_pressure_max, 0, 0);
+	input_set_abs_params(pInfo->input_dev, ABS_MT_AMPLITUDE,
+		0, (pdata->abs_pressure_max << 16) | pdata->abs_width_max, 0, 0);
+	input_set_abs_params(pInfo->input_dev, ABS_MT_POSITION,
+		0, ((1<<31) | (pdata->abs_x_max << 16) | pdata->abs_y_max), 0, 0);
+	ret = input_register_device(pInfo->input_dev);
+	if (ret) {
+		printk(KERN_INFO "Failed to register input device\n");
+		goto err_input_register_device_failed;
+	}
+#endif
 
 	PR_DISP_DEBUG("%s: Probe success!\n", __func__);
 	return ret;
-
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SUPERDEMO
+err_input_register_device_failed:
+	input_free_device(pInfo->input_dev);
+err_input_dev_alloc_failed:
+#endif
 err_create_workqueue:
 	gpio_free(pInfo->reset_pin);
 	gpio_free(pInfo->intr_pin);
@@ -684,6 +1000,10 @@ static int sii9234_remove(struct i2c_client *client)
 
 	gpio_free(pInfo->reset_pin);
 	gpio_free(pInfo->intr_pin);
+
+	if(board_build_flag() != SHIP_BUILD)
+		debugfs_remove(dbg_entry_dir);
+
 #ifndef CONFIG_HAS_EARLYSUSPEND
 	unregister_early_suspend(&pInfo->early_suspend);
 #endif
@@ -710,11 +1030,35 @@ static struct i2c_driver sii9234_driver = {
 		.owner = THIS_MODULE,
 	},
 };
+static void mhl_usb_status_notifier_func(int cable_type)
+{
+	T_MHL_SII9234_INFO *pInfo = sii9234_info_ptr;
+	/*in suspend mode, vbus change should be wakeup the system*/
+	mutex_lock(&mhl_early_suspend_sem);
+
+	if(cable_get_accessory_type() == DOCK_STATE_MHL && g_bEnterEarlySuspend){
+		if(pInfo->statMHL == CONNECT_TYPE_NONE) {
+			if(time_after(jiffies, suspend_jiffies + HZ))
+				update_mhl_status(true, CONNECT_TYPE_AC);
+		} else {
+			update_mhl_status(true, CONNECT_TYPE_NONE);
+			TPI_Init();
+		}
+	}
+	mutex_unlock(&mhl_early_suspend_sem);
+}
+
+static struct t_usb_status_notifier usb_status_notifier = {
+	.name = "mhl_vbus_detect",
+	.func = mhl_usb_status_notifier_func,
+};
 
 static int __init sii9234_init(void)
 {
+	usb_register_notifier(&usb_status_notifier);
 	return i2c_add_driver(&sii9234_driver);
 }
+
 
 static void __exit sii9234_exit(void)
 {

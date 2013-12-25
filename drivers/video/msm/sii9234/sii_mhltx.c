@@ -85,7 +85,6 @@ static void SiiMhlTxTmdsEnable(void)
 static bool SiiMhlTxSetStatus(uint8_t regToWrite, uint8_t value)
 {
 	cbus_req_t	req;
-	bool retVal;
 
 	req.retryCount  = 2;
 	req.command     = MHL_WRITE_STAT;
@@ -93,8 +92,7 @@ static bool SiiMhlTxSetStatus(uint8_t regToWrite, uint8_t value)
 	req.payload_u.msgData[0]  = value;
 
 	TPI_DEBUG_PRINT(("MhlTx:SiiMhlTxSetStatus\n"));
-	retVal = PutNextCBusTransaction(&req);
-	return retVal;
+	return( SiiMhlTxDrvSendCbusCommand( &req  ));
 }
 
 static bool SiiMhlTxSendLinkMode(void)
@@ -255,21 +253,29 @@ void Low_dongle_GPIO0(void)
 
 void SiiMhlTxMscDetectCharger(uint8_t data1)
 {
+	/* connected to TV; and TV has power output (default 0.5A min ) */
 	if ((data1 & 0x13) == 0x11) {
-		/* Turn off phone Vbus output ; */
-		/* Set battery charge current=500mA; */
-		/* Enable battery charger; */
 		mscCmdInProgress = false;
-		mhlTxConfig.mscState	  = MSC_STATE_POW_DONE;
+		mhlTxConfig.mscState = MSC_STATE_POW_DONE;
 		Chk_Dongle_Step = 0;
-		/* now suppose TV always provide 1A current */
-		TPI_DEBUG_PRINT(("1000mA charger!!\n"));
-		if (gStatusMHL != CONNECT_TYPE_AC) {
-			gStatusMHL = CONNECT_TYPE_AC;
-			ProcessMhlStatus(true, false);
+
+		if (data1 & 0x10) {
+			/* [bit4] POW ==1=AC charger attached */
+			TPI_DEBUG_PRINT(("1000mA charger!!\n"));
+			if (gStatusMHL != CONNECT_TYPE_AC) {
+				gStatusMHL = CONNECT_TYPE_AC;
+				ProcessMhlStatus(true, false);
+			}
+		} else {
+			TPI_DEBUG_PRINT(("500mA charger!!\n"));
+			if (gStatusMHL != CONNECT_TYPE_USB) {
+				gStatusMHL = CONNECT_TYPE_USB;
+				ProcessMhlStatus(true, false);
+			}
 		}
 	}
 
+	/* 03=dongle */
 	if ((data1 & 0x03) == 0x03) {
 
 		if (Chk_Dongle_Step == 0) {
@@ -397,15 +403,57 @@ void	SiiMhlTxGotMhlIntr(uint8_t intr_0, uint8_t intr_1)
 	else if (BIT_1 & intr_1)
 		SiiMhlTxDrvNotifyEdidChange();
 }
+bool SiiMhlTxSetPathEn(void )
+{
+	TPI_DEBUG_PRINT(("MhlTx:SiiMhlTxSetPathEn\n"));
+    SiiMhlTxTmdsEnable();
+    mhlTxConfig.linkMode |= MHL_STATUS_PATH_ENABLED;     // update local copy
+    return SiiMhlTxSetStatus( MHL_STATUS_REG_LINK_MODE, mhlTxConfig.linkMode);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+//
+// SiiMhlTxClrPathEn
+//
+bool SiiMhlTxClrPathEn( void )
+{
+	TPI_DEBUG_PRINT(("MhlTx: SiiMhlTxClrPathEn\n"));
+    SiiMhlTxDrvTmdsControl( false );
+    mhlTxConfig.linkMode &= ~MHL_STATUS_PATH_ENABLED;    // update local copy
+    return SiiMhlTxSetStatus( MHL_STATUS_REG_LINK_MODE, mhlTxConfig.linkMode);
+}
 
 void	SiiMhlTxGotMhlStatus(uint8_t status_0, uint8_t status_1)
 {
-	TPI_DEBUG_PRINT(("MhlTx: STATUS Arrived.%02X,%02X\n", (int) status_0, (int) status_1));
-
-	if (BIT_0 & status_0)
-		mhlTxConfig.mscState	 = MSC_STATE_BEGIN;
+	uint8_t StatusChangeBitMask0,StatusChangeBitMask1;
+    StatusChangeBitMask0 = status_0 ^ mhlTxConfig.status_0;
+    StatusChangeBitMask1 = status_1 ^ mhlTxConfig.status_1;
+	// Remember the event.   (other code checks the saved values, so save the values early, but not before the XOR operations above)
 	mhlTxConfig.status_0 = status_0;
 	mhlTxConfig.status_1 = status_1;
+
+	TPI_DEBUG_PRINT(("MhlTx: STATUS Arrived.%02X,%02X\n", (int) status_0, (int) status_1));
+
+	if(MHL_STATUS_DCAP_RDY & StatusChangeBitMask0)
+	{
+		if(MHL_STATUS_DCAP_RDY & status_0)
+		{
+			mhlTxConfig.mscState	 = MSC_STATE_BEGIN;
+		}
+	}
+
+	if(MHL_STATUS_PATH_ENABLED & StatusChangeBitMask1)
+    {
+        TPI_DEBUG_PRINT(("MhlTx: PATH_EN changed\n"));
+		if(MHL_STATUS_PATH_ENABLED & status_1)
+		{
+			SiiMhlTxSetPathEn();
+		}
+		else
+		{
+			SiiMhlTxClrPathEn();
+		}
+	}
 }
 
 bool SiiMhlTxRcpSend(uint8_t rcpKeyCode)
@@ -537,6 +585,26 @@ static uint8_t ProcessRcpKeyCode(uint8_t rcpKeyCode)
 		TPI_DEBUG_PRINT(("\n MHD_RCP_CMD_EXIT received %d\n\n", (int)rcpKeyCode));
 		sii9234_send_keyevent(KEY_BACK, 0);
 		break;
+	case MHD_RCP_CMD_PLAY:
+		TPI_DEBUG_PRINT(("\n MHD_RCP_CMD_PLAY received %d\n\n", (int)rcpKeyCode));
+		sii9234_send_keyevent(KEY_PLAY, 0);
+		break;
+	case MHD_RCP_CMD_STOP:
+		TPI_DEBUG_PRINT(("\n MHD_RCP_CMD_STOP received %d\n\n", (int)rcpKeyCode));
+		sii9234_send_keyevent(KEY_STOP, 0);
+		break;
+	case MHD_RCP_CMD_PAUSE:
+		TPI_DEBUG_PRINT(("\n MHD_RCP_CMD_PAUSE received %d\n\n", (int)rcpKeyCode));
+		sii9234_send_keyevent(KEY_PLAYPAUSE, 0);
+		break;
+	case MHD_RCP_CMD_REWIND:
+		TPI_DEBUG_PRINT(("\n MHD_RCP_CMD_REWIND received %d\n\n", (int)rcpKeyCode));
+		sii9234_send_keyevent(KEY_REWIND, 0);
+		break;
+	case MHD_RCP_CMD_FAST_FWD:
+		TPI_DEBUG_PRINT(("\n MHD_RCP_CMD_FAST_FWD received %d\n\n", (int)rcpKeyCode));
+		sii9234_send_keyevent(KEY_FASTFORWARD, 0);
+		break;
 	default:
 		break;
     }
@@ -556,6 +624,7 @@ void    ProcessRcp(uint8_t event, uint8_t eventParameter)
 		TPI_DEBUG_PRINT(("App: Got event = MHL_TX_EVENT_CONNECTION\n"));
 		break;
 	case    MHL_TX_EVENT_RCP_READY:
+#if 0
 		rcpKeyCode = APP_DEMO_RCP_SEND_KEY_CODE;
 		TPI_DEBUG_PRINT(("App: Got event = MHL_TX_EVENT_RCP_READY...Sending RCP (%02X)\n", (int) rcpKeyCode));
 		if ((0 == (BIT_0 & eventParameter)))
@@ -569,6 +638,7 @@ void    ProcessRcp(uint8_t event, uint8_t eventParameter)
 			TPI_DEBUG_PRINT(("Stupid coding check\n"));
 		} else
 			TPI_DEBUG_PRINT(("App: SiiMhlTxRcpSend (%02X) Returned Failure.\n", (int) rcpKeyCode));
+#endif
 		break;
 	case    MHL_TX_EVENT_RCP_RECEIVED:
 		TPI_DEBUG_PRINT(("App: Received an RCP key code = %02X\n", eventParameter));
@@ -580,6 +650,8 @@ void    ProcessRcp(uint8_t event, uint8_t eventParameter)
 		break;
 	case    MHL_TX_EVENT_RCPE_RECEIVED:
 		TPI_DEBUG_PRINT(("App: Received an RCPE = %02X\n", (int)eventParameter));
+		break;
+	case    MHL_TX_EVENT_NONE:
 		break;
 	default:
 		TPI_DEBUG_PRINT(("App: Got event = %02X, eventParameter = %02X\n", (int)event, (int)eventParameter));

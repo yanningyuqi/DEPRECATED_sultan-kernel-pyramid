@@ -1,29 +1,13 @@
-/* Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are
- * met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above
- *       copyright notice, this list of conditions and the following
- *       disclaimer in the documentation and/or other materials provided
- *       with the distribution.
- *     * Neither the name of Code Aurora Forum, Inc. nor the names of its
- *       contributors may be used to endorse or promote products derived
- *       from this software without specific prior written permission.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
  *
- * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
- * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
- * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
- * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
- * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
  */
 
@@ -38,8 +22,9 @@
 #include <linux/fb.h>
 #include <linux/hrtimer.h>
 #include <linux/msm_mdp.h>
-
+#include <linux/memory_alloc.h>
 #include <mach/hardware.h>
+#include <linux/ion.h>
 
 #ifdef CONFIG_MSM_BUS_SCALING
 #include <mach/msm_bus.h>
@@ -55,6 +40,11 @@
 
 extern uint32 mdp_hw_revision;
 extern ulong mdp4_display_intf;
+extern spinlock_t mdp_spin_lock;
+extern int mdp_rev;
+#if 1 /* HTC_CSP_START */
+extern atomic_t need_soft_reset;
+#endif /* HTC_CSP_END */
 
 #define MDP4_REVISION_V1		0
 #define MDP4_REVISION_V2		1
@@ -80,6 +70,13 @@ extern ulong mdp4_display_intf;
 #define MDPOP_SHARPENING	BIT(11) /* enable sharpening */
 #define MDPOP_BLUR		BIT(12) /* enable blur */
 #define MDPOP_FG_PM_ALPHA       BIT(13)
+#define MDP_ALLOC(x)  kmalloc(x, GFP_KERNEL)
+
+struct mdp_buf_type {
+	struct ion_handle *ihdl;
+	u32 phys_addr;
+	u32 size;
+};
 
 struct mdp_table_entry {
 	uint32_t reg;
@@ -104,7 +101,6 @@ typedef struct mdpImg_ {
 } MDPIMG;
 
 #define MDP_OUTP(addr, data) outpdw((addr), (data))
-#define MDP_KTIME2USEC(kt) (kt.tv.sec*1000000 + kt.tv.nsec/1000)
 
 #define MDP_BASE msm_mdp_base
 
@@ -129,22 +125,23 @@ typedef enum {
 } MDP_BLOCK_POWER_STATE;
 
 typedef enum {
-	MDP_MASTER_BLOCK,
 	MDP_CMD_BLOCK,
 	MDP_OVERLAY0_BLOCK,
-	MDP_OVERLAY1_BLOCK,
-	MDP_DMA2_BLOCK,
+	MDP_MASTER_BLOCK,
 	MDP_PPP_BLOCK,
+	MDP_DMA2_BLOCK,
 	MDP_DMA3_BLOCK,
 	MDP_DMA_S_BLOCK,
 	MDP_DMA_E_BLOCK,
+	MDP_OVERLAY1_BLOCK,
+	MDP_OVERLAY2_BLOCK,
 	MDP_MAX_BLOCK
 } MDP_BLOCK_TYPE;
 
 /* Let's keep Q Factor power of 2 for optimization */
 #define MDP_SCALE_Q_FACTOR 512
 
-#ifdef CONFIG_MSM_MDP31
+#ifdef CONFIG_FB_MSM_MDP31
 #define MDP_MAX_X_SCALE_FACTOR (MDP_SCALE_Q_FACTOR*8)
 #define MDP_MIN_X_SCALE_FACTOR (MDP_SCALE_Q_FACTOR/8)
 #define MDP_MAX_Y_SCALE_FACTOR (MDP_SCALE_Q_FACTOR*8)
@@ -224,14 +221,12 @@ struct mdp_dma_data {
 	struct semaphore mutex;
 	struct completion comp;
 	struct completion dmap_comp;
-	uint32_t	busy_pid;
-	uint32_t	dmap_pid;
 };
 
 struct mdp_reg {
-    uint32_t reg;
-    uint32_t val;
-    uint32_t mask;
+	uint32_t reg;
+	uint32_t val;
+	uint32_t mask;
 };
 
 #define MDP_CMD_DEBUG_ACCESS_BASE   (MDP_BASE+0x10000)
@@ -241,11 +236,12 @@ struct mdp_reg {
 #define MDP_PPP_TERM 0x4
 #define MDP_DMA_S_TERM 0x8
 #define MDP_DMA_E_TERM 0x10
-#ifdef CONFIG_MSM_MDP40
+#ifdef CONFIG_FB_MSM_MDP40
 #define MDP_OVERLAY0_TERM 0x20
 #define MDP_OVERLAY1_TERM 0x40
 #endif
 #define MDP_HISTOGRAM_TERM 0x80
+#define MDP_OVERLAY2_TERM 0x100
 
 #define ACTIVE_START_X_EN BIT(31)
 #define ACTIVE_START_Y_EN BIT(31)
@@ -256,7 +252,7 @@ struct mdp_reg {
 #define LCDC_FRAME_START    BIT(15)
 #define LCDC_UNDERFLOW      BIT(16)
 
-#ifdef CONFIG_MSM_MDP22
+#ifdef CONFIG_FB_MSM_MDP22
 #define MDP_DMA_P_DONE 	BIT(2)
 #else
 #define MDP_DMA_P_DONE 	BIT(14)
@@ -268,7 +264,11 @@ struct mdp_reg {
 #define TV_OUT_DMA3_START   BIT(13)
 #define MDP_HIST_DONE       BIT(20)
 
-#ifdef CONFIG_MSM_MDP22
+/* histogram interrupts */
+#define INTR_HIST_DONE			BIT(1)
+#define INTR_HIST_RESET_SEQ_DONE	BIT(0)
+
+#ifdef CONFIG_FB_MSM_MDP22
 #define MDP_ANY_INTR_MASK (MDP_PPP_DONE| \
 			MDP_DMA_P_DONE| \
 			TV_ENC_UNDERRUN)
@@ -301,12 +301,12 @@ struct mdp_reg {
 #define CLR_CR CLR_R
 
 /* from lsb to msb */
-#define MDP_GET_PACK_PATTERN(a, x, y, z, bit) (((a)<<(bit*3))|((x)<<(bit*2))|((y)<<bit)|(z))
+#define MDP_GET_PACK_PATTERN(a,x,y,z,bit) (((a)<<(bit*3))|((x)<<(bit*2))|((y)<<bit)|(z))
 
 /*
  * 0x0000 0x0004 0x0008 MDP sync config
  */
-#ifdef CONFIG_MSM_MDP22
+#ifdef CONFIG_FB_MSM_MDP22
 #define MDP_SYNCFG_HGT_LOC 22
 #define MDP_SYNCFG_VSYNC_EXT_EN BIT(21)
 #define MDP_SYNCFG_VSYNC_INT_EN BIT(20)
@@ -557,7 +557,12 @@ struct mdp_reg {
 #define DMA_IBUF_FORMAT_RGB888              0
 #define DMA_IBUF_FORMAT_xRGB8888_OR_ARGB8888  BIT(26)
 
-#ifdef CONFIG_MSM_MDP22
+#ifdef CONFIG_FB_MSM_MDP303
+#define DMA_OUT_SEL_DSI_CMD                  BIT(19)
+#define DMA_OUT_SEL_DSI_VIDEO               (3 << 19)
+#endif
+
+#ifdef CONFIG_FB_MSM_MDP22
 #define DMA_OUT_SEL_MDDI BIT(14)
 #define DMA_AHBM_LCD_SEL_PRIMARY 0
 #define DMA_AHBM_LCD_SEL_SECONDARY BIT(15)
@@ -591,7 +596,7 @@ struct mdp_reg {
 #define MDDI_VDO_PACKET_DESC	 0x5666	/* 18 bits */
 #define MDDI_VDO_PACKET_DESC_24  0x5888
 
-#ifdef CONFIG_MSM_MDP40
+#ifdef CONFIG_FB_MSM_MDP40
 #define MDP_INTR_ENABLE		(msm_mdp_base + 0x0050)
 #define MDP_INTR_STATUS		(msm_mdp_base + 0x0054)
 #define MDP_INTR_CLEAR		(msm_mdp_base + 0x0058)
@@ -620,7 +625,7 @@ struct mdp_reg {
 #define MDP_CSC_POST_BV1n(n)	(msm_mdp_base + 0x40580 + 4 * (n))
 #define MDP_CSC_POST_BV2n(n)	(msm_mdp_base + 0x405c0 + 4 * (n))
 
-#ifdef CONFIG_MSM_MDP31
+#ifdef CONFIG_FB_MSM_MDP31
 #define MDP_CSC_PRE_LV1n(n)	(msm_mdp_base + 0x40600 + 4 * (n))
 #define MDP_CSC_PRE_LV2n(n)	(msm_mdp_base + 0x40640 + 4 * (n))
 #define MDP_CSC_POST_LV1n(n)	(msm_mdp_base + 0x40680 + 4 * (n))
@@ -659,6 +664,8 @@ int mdp_ppp_blit(struct fb_info *info, struct mdp_blit_req *req);
 void mdp_lcd_update_workqueue_handler(struct work_struct *work);
 void mdp_vsync_resync_workqueue_handler(struct work_struct *work);
 void mdp_dma2_update(struct msm_fb_data_type *mfd);
+void mdp_vsync_cfg_regs(struct msm_fb_data_type *mfd,
+	boolean first_time);
 void mdp_config_vsync(struct msm_fb_data_type *);
 uint32 mdp_get_lcd_line_counter(struct msm_fb_data_type *mfd);
 enum hrtimer_restart mdp_dma2_vsync_hrtimer_handler(struct hrtimer *ht);
@@ -687,8 +694,25 @@ void mdp_dma3_update(struct msm_fb_data_type *mfd);
 int mdp_lcdc_on(struct platform_device *pdev);
 int mdp_lcdc_off(struct platform_device *pdev);
 void mdp_lcdc_update(struct msm_fb_data_type *mfd);
+
+#ifdef CONFIG_FB_MSM_MDP303
+int mdp_dsi_video_on(struct platform_device *pdev);
+int mdp_dsi_video_off(struct platform_device *pdev);
+void mdp_dsi_video_update(struct msm_fb_data_type *mfd);
+void mdp3_dsi_cmd_dma_busy_wait(struct msm_fb_data_type *mfd);
+#endif
+
 int mdp_hw_cursor_update(struct fb_info *info, struct fb_cursor *cursor);
+#if defined(CONFIG_FB_MSM_OVERLAY) && defined(CONFIG_FB_MSM_MDP40)
 int mdp_hw_cursor_sync_update(struct fb_info *info, struct fb_cursor *cursor);
+#else
+static inline int mdp_hw_cursor_sync_update(struct fb_info *info,
+		struct fb_cursor *cursor)
+{
+	return 0;
+}
+#endif
+
 void mdp_enable_irq(uint32 term);
 void mdp_disable_irq(uint32 term);
 void mdp_disable_irq_nosync(uint32 term);
@@ -700,6 +724,7 @@ unsigned long mdp_perf_level2clk_rate(uint32 perf_level);
 
 #ifdef CONFIG_MSM_BUS_SCALING
 int mdp_bus_scale_update_request(uint32_t index);
+int mdp_bus_scale_table_num(void);
 #endif
 
 #ifdef MDP_HW_VSYNC
@@ -716,54 +741,27 @@ int mdp_debugfs_init(void);
 void mdp_dma_s_update(struct msm_fb_data_type *mfd);
 int mdp_start_histogram(struct fb_info *info);
 int mdp_stop_histogram(struct fb_info *info);
+int mdp_histogram_ctrl(boolean en);
+void mdp_footswitch_ctrl(boolean on);
 
-extern ktime_t mdp_dma2_last_update_time;
+#ifdef CONFIG_FB_MSM_MDP303
+static inline void mdp4_dsi_cmd_dma_busy_wait(struct msm_fb_data_type *mfd)
+{
+	/* empty */
+}
 
-extern uint32 mdp_dma2_update_time_in_usec;
-extern int mdp_lcd_rd_cnt_offset_slow;
-extern int mdp_lcd_rd_cnt_offset_fast;
-extern int mdp_usec_diff_threshold;
-
-#ifdef CONFIG_FB_MSM_LCDC
-extern int first_pixel_start_x;
-extern int first_pixel_start_y;
-#endif
-
-extern atomic_t dsi_unset_cnt;
-
-#ifdef CONFIG_FB_MSM_MIPI_DSI
-extern atomic_t dsi_unset_cnt;
-extern struct completion dsi_unset_comp;
-#endif
-
-#ifdef CONFIG_FB_MSM_DTV
-extern atomic_t mdp_dtv_on;
-#endif
-
-#ifdef CONFIG_FB_MSM_DTV
-extern struct mdp4_overlay_pipe *dtv_pipe;
-#endif
-
-extern atomic_t mdp_block_power_cnt[MDP_MAX_BLOCK];
-extern unsigned long mdp_timer_duration;
-
-extern atomic_t need_soft_reset;
-
-extern spinlock_t mdp_spin_lock;
-extern struct workqueue_struct *mdp_vsync_wq;
-extern int vsync_mode;
-
-extern uint32 mdp_intr_mask;
-
-extern u32 msm_fb_debug_enabled;
-extern struct workqueue_struct *mdp_dma_wq;
-
-extern struct completion ov_comp;
-extern atomic_t ov_play;
-extern atomic_t ov_unset;
-
-#ifdef CONFIG_FB_MSM_LOGO
-extern int load_565rle_image(char *filename);
+static inline void mdp4_dsi_blt_dmap_busy_wait(struct msm_fb_data_type *mfd)
+{
+	/* empty */
+}
+static inline void mdp4_overlay_dsi_state_set(int state)
+{
+	/* empty */
+}
+static inline int mdp4_overlay_dsi_state_get(void)
+{
+	return 0;
+}
 #endif
 
 #endif /* MDP_H */

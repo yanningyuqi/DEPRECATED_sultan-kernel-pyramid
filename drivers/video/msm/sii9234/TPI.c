@@ -25,13 +25,28 @@
 #include "inc/si_datatypes.h"
 #include <linux/jiffies.h>
 #include <mach/board.h>
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SUPERDEMO
+#include <mach/mhl.h>
+#endif
 #include "sii_mhltx.h"
+
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SUPERDEMO
+#define MHL_SII9234_SCRATCHPAD_REG_MAX 16
+static int g_sii9234_intr_writeburst_en = E_MHL_FALSE;
+static uint16_t g_sii9234_finger_num = MHL_SII9234_TOUCH_FINGER_NUM_MAX;
+static T_MHL_EVT_REMOTE_CNTL g_sii9234_remote_evt_type = E_MHL_EVT_UNKNOWN;
+static T_MHL_REMOTE_KEY_DATA g_sii9234_key_data;
+static T_MHL_REMOTE_FINGER_DATA g_sii9234_finger_data[MHL_SII9234_TOUCH_FINGER_NUM_MAX];
+#endif
 
 static unsigned long rsenCheckTimeout = 0;
 static unsigned long deglitchTimeout = 0;
 static int rsenCount = 0;
 static int WR_Dcap_Rdy_Int_Done = false;/* new in V100109 */
 static bool IsEstablished = false;/* new in V100109 */
+extern bool g_bProbe;
+extern u8 dbg_drv_str_a3, dbg_drv_str_on;
+
 
 static	uint8_t	fwPowerState = POWER_STATE_FIRST_INIT;
 #ifdef CONFIG_INTERNAL_CHARGING_SUPPORT
@@ -50,8 +65,6 @@ uint8_t		mscCmdInProgress;	/* false when it is okay to send a new command */
 static	uint8_t	dsHpdStatus = 0;
 static  uint8_t contentOn = 0;
 /* HTC board parameters */
-
-static mhl_board_params gBoardParams;
 
 #define	I2C_READ_MODIFY_WRITE(saddr, offset, mask)	I2C_WriteByte(saddr, offset, I2C_ReadByte(saddr, offset) | (mask));
 
@@ -95,7 +108,6 @@ static	void	MhlTxDrvProcessDisconnection(void);
 static	void	ApplyDdcAbortSafety(void);
 
 static  bool	HDCPSuccess;
-
 #ifdef CONFIG_CABLE_DETECT_ACCESSORY
 void    ProcessMhlStatus(bool, bool);
 #endif
@@ -136,13 +148,16 @@ static void TxHW_Reset(void)
 	sii9234_reset();
 }
 
-bool TPI_Init(mhl_board_params params)
+bool TPI_Init(void)
 {
 	fwPowerState = POWER_STATE_FIRST_INIT;
 	WR_Dcap_Rdy_Int_Done = false;
 	IsEstablished = false;
-	gBoardParams = params;
 	HDCPSuccess = false;
+	if(!g_bProbe) {
+		TPI_DEBUG_PRINT(("Drv: Sii9244 not ready, this is called from cable detection\n"));
+		return false;
+	}
 	SiiMhlTxInitialize(true, 0);
 
 	TxHW_Reset();
@@ -190,7 +205,6 @@ void	TPI_Poll(void)
 		}
 
 #endif
-
 		MhlCbusIsr();
 	}
 
@@ -266,7 +280,7 @@ bool SiiMhlTxDrvSendCbusCommand(cbus_req_t *pReq)
 		break;
 
 	case MHL_WRITE_STAT:
-		WriteByteCBUS((0x13 & 0xFF), pReq->offsetData + 0x30);
+		//WriteByteCBUS((0x13 & 0xFF), pReq->offsetData + 0x30);
 		startbit = (0x01 << 3);
 		break;
 
@@ -413,13 +427,11 @@ static void WriteInitialRegisterValues(void)
 	I2C_WriteByte(TPI_SLAVE_ADDR, 0xA0, 0xD0);
 	I2C_WriteByte(TPI_SLAVE_ADDR, 0xA1, 0xFC);
 
-	if (gBoardParams.valid) { /*assign value by board*/
-		I2C_WriteByte(TPI_SLAVE_ADDR, 0xA3, gBoardParams.regA3);
-		I2C_WriteByte(TPI_SLAVE_ADDR, 0xA6, gBoardParams.regA6);
-	} else { /*default settings*/
+	if(board_build_flag() != SHIP_BUILD && dbg_drv_str_on)
+		I2C_WriteByte(TPI_SLAVE_ADDR, 0xA3, dbg_drv_str_a3);
+	else
 		I2C_WriteByte(TPI_SLAVE_ADDR, 0xA3, 0xEB);
-		I2C_WriteByte(TPI_SLAVE_ADDR, 0xA6, 0x0C);
-	}
+	I2C_WriteByte(TPI_SLAVE_ADDR, 0xA6, 0x0C);
 
 	I2C_WriteByte(TPI_SLAVE_ADDR, 0x2B, 0x01);
 
@@ -584,7 +596,7 @@ void CbusWakeUpPulseGenerator(void)
 	/* I2C_WriteByte(TPI_SLAVE_ADDR, 0x96, (I2C_ReadByte(TPI_SLAVE_ADDR, 0x96) | 0xC0));*/
 	regval |= 0xC0;
 	I2C_WriteByte(TPI_SLAVE_ADDR, 0x96, regval);
-	DelayMS(T_SRC_WAKE_PULSE_WIDTH_1 - 2);
+	DelayMS(T_SRC_WAKE_PULSE_WIDTH_1 - 1);
 
 	/* I2C_WriteByte(TPI_SLAVE_ADDR, 0x96, (I2C_ReadByte(TPI_SLAVE_ADDR, 0x96) & 0x3F));*/
 	regval &= 0x3F;
@@ -669,6 +681,18 @@ void	ProcessRgnd(void)
 			CLR_BIT(TPI_SLAVE_ADDR, 0x95, 5);
 	}
 }
+void change_driving_strength(byte reg_a3, byte reg_a6)
+{
+	if(board_build_flag() != SHIP_BUILD && dbg_drv_str_on) {
+		TPI_DEBUG_PRINT(("Drv: %s debuging driving str 0xA3 = %x\n", __func__, dbg_drv_str_a3));
+		return;
+	}
+	TPI_DEBUG_PRINT(("Drv: %s 0xA3 = %x 0xA6 = %x\n",
+		__func__, reg_a3,reg_a6 ));
+	I2C_WriteByte(TPI_SLAVE_ADDR, 0xA3, reg_a3);
+	I2C_WriteByte(TPI_SLAVE_ADDR, 0xA6, reg_a6);
+}
+
 
 bool	IsD0Mode(void)
 {
@@ -797,7 +821,7 @@ static	int	Int4Isr(void)
 #ifdef	APPLY_PLL_RECOVERY
 static void ApplyPllRecovery(void)
 {
-	if (!HDCPSuccess)
+	if (!HDCPSuccess) //8x60 needs to keep it, or it will flash
 		return;
 
 	CLR_BIT(TPI_SLAVE_ADDR, 0x80, 4);
@@ -817,7 +841,7 @@ static void ApplyPllRecovery(void)
 void SiiMhlTxDrvRecovery(void)
 {
 	if ((I2C_ReadByte(TPI_SLAVE_ADDR, (0x74)) & BIT_0)) {
-		SET_BIT(TPI_SLAVE_ADDR, (0x74), BIT_0);
+		SET_BIT(TPI_SLAVE_ADDR, (0x74), 0);
 		TPI_DEBUG_PRINT(("Drv: SCDT Interrupt\n"));
 
 		if ((((I2C_ReadByte(TPI_SLAVE_ADDR, 0x81)) & BIT_1) >> 1))
@@ -830,7 +854,7 @@ void SiiMhlTxDrvRecovery(void)
 
 		ApplyPllRecovery();
 
-		SET_BIT(TPI_SLAVE_ADDR, (0x72), BIT_1);
+		SET_BIT(TPI_SLAVE_ADDR, (0x72), 1);
 
 	}
 }
@@ -865,9 +889,12 @@ static void MhlTxDrvProcessConnection(void)
 	rsenCheckTimeout = jiffies + HZ/3;
 	rsenCount = 0;
 
+	TPI_DEBUG_PRINT(("Update Rx Dcap_Rdy Int \n"));
+
+	DelayMS(T_SRC_RXSENSE_CHK-100);
 	contentOn = 1;
 	SiiMhlTxNotifyConnection(mhlConnected = true);
-	SiiMhlTxDrvTmdsControl(true);
+	//SiiMhlTxDrvTmdsControl(true);
 #if 1
 	if (!(I2C_ReadByte(TPI_SLAVE_ADDR, 0x09) & BIT_2)) {
 		TPI_DEBUG_PRINT(("400ms exp, Rsen=0,discnct\n"));
@@ -890,6 +917,8 @@ static void MhlTxDrvProcessDisconnection(void)
 
 	TPI_DEBUG_PRINT(("Drv: MhlTxDrvProcessDisconnection\n"));
 
+        if(fwPowerState == POWER_STATE_D0_NO_MHL)
+               fwPowerState = POWER_STATE_D0_MHL;
 
 	I2C_WriteByte(TPI_SLAVE_ADDR, 0xA0, 0xD0);
 
@@ -981,13 +1010,85 @@ static uint8_t CBusProcessErrors(uint8_t intStatus)
 	return(result);
 }
 
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SUPERDEMO
+void Tpi_query_remote_keyInfo(T_MHL_REMOTE_KEY_DATA *data)
+{
+	memcpy(data, &g_sii9234_key_data, sizeof(T_MHL_REMOTE_KEY_DATA));
+}
+
+void Tpi_query_remote_touchInfo(uint16_t *finger_num, T_MHL_REMOTE_FINGER_DATA *data)
+{
+	uint16_t fingers = g_sii9234_finger_num;
+
+	if (fingers > MHL_SII9234_TOUCH_FINGER_NUM_MAX) {
+		TPI_DEBUG_PRINT(("[Err]: invaild fingers = %d\n", fingers));
+		return;
+	}
+	*finger_num = fingers;
+	memcpy(data, g_sii9234_finger_data, sizeof(T_MHL_REMOTE_FINGER_DATA)*fingers);
+#if 0
+	TPI_DEBUG_PRINT(("[SWA]: x = %d, y = %d, z = %d\n",
+		g_sii9234_finger_data[0].x, g_sii9234_finger_data[0].y, g_sii9234_finger_data[0].z));
+	TPI_DEBUG_PRINT(("[SWA]: x1 = %d, y1 = %d, z1 = %d\n",
+		g_sii9234_finger_data[1].x, g_sii9234_finger_data[1].y, g_sii9234_finger_data[1].z));
+#endif
+}
+
+void Tpi_reset_remote_intr(void)
+{
+	g_sii9234_intr_writeburst_en = E_MHL_FALSE;
+}
+
+int Tpi_query_remote_type(uint16_t *evt_type)
+{
+	*evt_type = E_MHL_EVT_UNKNOWN;
+	if (g_sii9234_intr_writeburst_en)
+		*evt_type = g_sii9234_remote_evt_type;
+	return g_sii9234_intr_writeburst_en;
+}
+
+void Tpi_parse_scratchpad_data(uint8_t *Data)
+{
+	memset(g_sii9234_finger_data, 0, sizeof(T_MHL_REMOTE_FINGER_DATA)*MHL_SII9234_TOUCH_FINGER_NUM_MAX);
+	memset(&g_sii9234_key_data, 0, sizeof(T_MHL_REMOTE_KEY_DATA));
+	g_sii9234_finger_num = Data[11];
+	g_sii9234_remote_evt_type = Data[13];
+	switch (g_sii9234_remote_evt_type) {
+	case E_MHL_EVT_REMOTE_KEY:
+	case E_MHL_EVT_REMOTE_KEY_RELEASE:
+		g_sii9234_key_data.keyIn = E_MHL_TRUE;
+		g_sii9234_key_data.keyCode = Data[14];
+		break;
+	case E_MHL_EVT_REMOTE_TOUCH:
+		/* finger 1 press */
+		if ((Data[1] == E_MHL_EVT_REMOTE_TOUCH_PRESS || Data[1] == E_MHL_EVT_REMOTE_TOUCH_RELEASE)) {
+			g_sii9234_finger_data[0].x = Data[2] | (Data[3] << 8);
+			g_sii9234_finger_data[0].y = Data[4] | (Data[5] << 8);
+			g_sii9234_finger_data[0].z = Data[1];
+		}
+		/* finger 2 press */
+		if ((Data[6] == E_MHL_EVT_REMOTE_TOUCH_PRESS || Data[6] == E_MHL_EVT_REMOTE_TOUCH_RELEASE)) {
+			g_sii9234_finger_data[1].x = Data[7] | (Data[8] << 8);
+			g_sii9234_finger_data[1].y = Data[9] | (Data[10] << 8);
+			g_sii9234_finger_data[1].z = Data[6];
+		}
+		break;
+	default:
+		TPI_DEBUG_PRINT(("Err: invaild remote event = %d\n", g_sii9234_remote_evt_type));
+		break;
+	}
+}
+#endif
+
 static void MhlCbusIsr(void)
 {
 	uint8_t		cbusInt;
 	uint8_t     gotData[4];
 	uint8_t		i;
 	uint8_t		reg71 = I2C_ReadByte(TPI_SLAVE_ADDR, 0x71);
-
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SUPERDEMO
+	uint8_t		Data[MHL_SII9234_SCRATCHPAD_REG_MAX] = {0};
+#endif
 
 
 	cbusInt = ReadByteCBUS(0x08);
@@ -1031,6 +1132,22 @@ static void MhlCbusIsr(void)
 	if (cbusInt)
 		TPI_DEBUG_PRINT(("Drv: CBUS INTR_2: %d\n", (int) cbusInt));
 
+#ifdef CONFIG_FB_MSM_HDMI_MHL_SUPERDEMO
+	if (cbusInt & BIT_0) {
+		g_sii9234_intr_writeburst_en = E_MHL_TRUE;
+		for (i = 0; i < MHL_SII9234_SCRATCHPAD_REG_MAX; i++) {
+			Data[i] = ReadByteCBUS(0xc0+i);
+#if 0
+			if (i == 13)
+				TPI_DEBUG_PRINT(("Addr 0x%x = 0%x\n", 0xc0+i, Data[i]));
+			if (i == 14)
+				TPI_DEBUG_PRINT(("Addr 0x%x = 0%x\n", 0xc0+i, Data[i]));
+#endif
+		}
+		Tpi_parse_scratchpad_data(Data);
+	}
+#endif
+
 	if (cbusInt & BIT_2) {
 		TPI_DEBUG_PRINT(("Drv: MHL INTR Received\n"));
 		SiiMhlTxGotMhlIntr(ReadByteCBUS(0xA0), ReadByteCBUS(0xA1));
@@ -1073,4 +1190,13 @@ void D2ToD3(void)
 	TPI_DEBUG_PRINT(("D2 To D3 mode\n"));
 	I2C_WriteByte(HDMI_SLAVE_ADDR, 0x01, 0x03);
 	I2C_WriteByte(0x7A, 0x3D, I2C_ReadByte(0x7A, 0x3D) & 0xFE);
+	fwPowerState = POWER_STATE_D3;
+}
+bool tpi_get_hpd_state(void)
+{
+	uint8_t cbusInt, status;
+	cbusInt = ReadByteCBUS(0x0D);
+	status = cbusInt & BIT_6;
+	TPI_DEBUG_PRINT(("Drv: %s hpd status %d\n", __func__, status));
+	return (status) ? true : false;
 }

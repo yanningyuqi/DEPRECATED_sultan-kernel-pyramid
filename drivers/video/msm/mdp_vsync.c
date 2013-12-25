@@ -9,11 +9,6 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
- * 02110-1301, USA.
- *
  */
 
 #include <linux/module.h>
@@ -39,9 +34,8 @@
 #include "mdp.h"
 #include "msm_fb.h"
 #include "mddihost.h"
-#include <mach/debug_display.h>
 
-#ifdef CONFIG_MSM_MDP40
+#ifdef CONFIG_FB_MSM_MDP40
 #include "mdp4.h"
 
 #define MDP_SYNC_CFG_0		0x100
@@ -60,17 +54,24 @@
 #define MDP_PRIM_VSYNC_INIT_VAL	0x328
 #endif
 
+extern mddi_lcd_type mddi_lcd_idx;
+extern spinlock_t mdp_spin_lock;
+extern struct workqueue_struct *mdp_vsync_wq;
+extern int lcdc_mode;
+extern int vsync_mode;
+
 #ifdef MDP_HW_VSYNC
 int vsync_above_th = 4;
 int vsync_start_th = 1;
 int vsync_load_cnt;
 int vsync_clk_status;
 DEFINE_MUTEX(vsync_clk_lock);
-DEFINE_MUTEX(vsync_timer_lock);
+static DEFINE_SPINLOCK(vsync_timer_lock);
 
 static struct clk *mdp_vsync_clk;
 static struct msm_fb_data_type *vsync_mfd;
 static unsigned char timer_shutdown_flag;
+static uint32 vsync_cnt_cfg;
 
 void mdp_hw_vsync_clk_enable(struct msm_fb_data_type *mfd)
 {
@@ -100,10 +101,20 @@ static void mdp_set_vsync(unsigned long data);
 void mdp_vsync_clk_enable(void)
 {
 	if (vsync_mfd) {
+#if 1 /* HTC_CSP_START */
+		unsigned int timeout = (vsync_clk_status == 0)? 18 : 0; /* wait 17 ms at most */
+#endif /* HTC_CSP_END */
 		mdp_hw_vsync_clk_enable(vsync_mfd);
 		if (!vsync_mfd->vsync_resync_timer.function)
 			mdp_set_vsync((unsigned long) vsync_mfd);
-
+#if 1 /* HTC_CSP_START */
+		if (timeout) {
+			uint32 count;
+			for (count = inpdw(MDP_BASE + 0x140) >> 16; timeout && count == inpdw(MDP_BASE + 0x140) >> 16; --timeout) {
+				hr_msleep(1);
+			}
+		}
+#endif /* HTC_CSP_END */
 	}
 }
 
@@ -111,13 +122,13 @@ void mdp_vsync_clk_disable(void)
 {
 	if (vsync_mfd) {
 		if (vsync_mfd->vsync_resync_timer.function) {
-			mutex_lock(&vsync_timer_lock);
+			spin_lock(&vsync_timer_lock);
 			timer_shutdown_flag = 1;
-			mutex_unlock(&vsync_timer_lock);
+			spin_unlock(&vsync_timer_lock);
 			del_timer_sync(&vsync_mfd->vsync_resync_timer);
-			mutex_lock(&vsync_timer_lock);
+			spin_lock(&vsync_timer_lock);
 			timer_shutdown_flag = 0;
-			mutex_unlock(&vsync_timer_lock);
+			spin_unlock(&vsync_timer_lock);
 			vsync_mfd->vsync_resync_timer.function = NULL;
 		}
 
@@ -153,7 +164,7 @@ static void mdp_set_vsync(unsigned long data)
 		     mfd->vsync_handler_pending);
 	}
 
-	mutex_lock(&vsync_timer_lock);
+	spin_lock(&vsync_timer_lock);
 	if (!timer_shutdown_flag) {
 		mfd->vsync_resync_timer.function = mdp_set_vsync;
 		mfd->vsync_resync_timer.data = data;
@@ -161,7 +172,7 @@ static void mdp_set_vsync(unsigned long data)
 			jiffies + mfd->panel_info.lcd.vsync_notifier_period;
 		add_timer(&mfd->vsync_resync_timer);
 	}
-	mutex_unlock(&vsync_timer_lock);
+	spin_unlock(&vsync_timer_lock);
 }
 
 static void mdp_vsync_handler(void *data)
@@ -169,7 +180,7 @@ static void mdp_vsync_handler(void *data)
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)data;
 
 	if (vsync_clk_status == 0) {
-		PR_DISP_DEBUG("Warning: vsync clk is disabled\n");
+		pr_debug("Warning: vsync clk is disabled\n");
 		mfd->vsync_handler_pending = FALSE;
 		return;
 	}
@@ -179,7 +190,7 @@ static void mdp_vsync_handler(void *data)
 		if (mfd->panel_power_on) {
 			MDP_OUTP(MDP_BASE + MDP_SYNC_STATUS_0, vsync_load_cnt);
 
-#ifdef CONFIG_MSM_MDP40
+#ifdef CONFIG_FB_MSM_MDP40
 			if (mdp_hw_revision < MDP4_REVISION_V2_1)
 				MDP_OUTP(MDP_BASE + MDP_SYNC_STATUS_1,
 						vsync_load_cnt);
@@ -220,7 +231,7 @@ static void mdp_set_sync_cfg_0(struct msm_fb_data_type *mfd, int vsync_cnt)
 	MDP_OUTP(MDP_BASE + MDP_SYNC_CFG_0, cfg);
 }
 
-#ifdef CONFIG_MSM_MDP40
+#ifdef CONFIG_FB_MSM_MDP40
 static void mdp_set_sync_cfg_1(struct msm_fb_data_type *mfd, int vsync_cnt)
 {
 	unsigned long cfg;
@@ -234,6 +245,61 @@ static void mdp_set_sync_cfg_1(struct msm_fb_data_type *mfd, int vsync_cnt)
 	MDP_OUTP(MDP_BASE + MDP_SYNC_CFG_1, cfg);
 }
 #endif
+
+void mdp_vsync_cfg_regs(struct msm_fb_data_type *mfd,
+	boolean first_time)
+{
+	/* MDP cmd block enable */
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON,
+			  FALSE);
+	if (first_time)
+		mdp_hw_vsync_clk_enable(mfd);
+
+	mdp_set_sync_cfg_0(mfd, vsync_cnt_cfg);
+
+#ifdef CONFIG_FB_MSM_MDP40
+	if (mdp_hw_revision < MDP4_REVISION_V2_1)
+		mdp_set_sync_cfg_1(mfd, vsync_cnt_cfg);
+#endif
+
+	/*
+	 * load the last line + 1 to be in the
+	 * safety zone
+	 */
+	vsync_load_cnt = mfd->panel_info.yres;
+
+	/* line counter init value at the next pulse */
+	MDP_OUTP(MDP_BASE + MDP_PRIM_VSYNC_INIT_VAL,
+		vsync_load_cnt);
+#ifdef CONFIG_FB_MSM_MDP40
+	if (mdp_hw_revision < MDP4_REVISION_V2_1) {
+		MDP_OUTP(MDP_BASE +	MDP_SEC_VSYNC_INIT_VAL,
+			vsync_load_cnt);
+	}
+#endif
+
+	/*
+	 * external vsync source pulse width and
+	 * polarity flip
+	 */
+	MDP_OUTP(MDP_BASE + MDP_PRIM_VSYNC_OUT_CTRL, BIT(0));
+#ifdef CONFIG_FB_MSM_MDP40
+	if (mdp_hw_revision < MDP4_REVISION_V2_1) {
+		MDP_OUTP(MDP_BASE +	MDP_SEC_VSYNC_OUT_CTRL, BIT(0));
+		MDP_OUTP(MDP_BASE +	MDP_VSYNC_SEL, 0x20);
+	}
+#endif
+
+	/* threshold */
+	MDP_OUTP(MDP_BASE + 0x200, (vsync_above_th << 16) |
+		 (vsync_start_th));
+
+	if (first_time)
+		mdp_hw_vsync_clk_disable(mfd);
+
+	/* MDP cmd block disable */
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+}
 #endif
 
 void mdp_config_vsync(struct msm_fb_data_type *mfd)
@@ -268,7 +334,7 @@ void mdp_config_vsync(struct msm_fb_data_type *mfd)
 			mfd->use_mdp_vsync = 1;
 
 		if (mfd->use_mdp_vsync) {
-			uint32 vsync_cnt_cfg, vsync_cnt_cfg_dem;
+			uint32 vsync_cnt_cfg_dem;
 			uint32 mdp_vsync_clk_speed_hz;
 
 			mdp_vsync_clk_speed_hz = clk_get_rate(mdp_vsync_clk);
@@ -286,60 +352,7 @@ void mdp_config_vsync(struct msm_fb_data_type *mfd)
 				vsync_cnt_cfg =
 				    (mdp_vsync_clk_speed_hz) /
 				    vsync_cnt_cfg_dem;
-
-				/* MDP cmd block enable */
-				mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON,
-					      FALSE);
-				mdp_hw_vsync_clk_enable(mfd);
-
-				mdp_set_sync_cfg_0(mfd, vsync_cnt_cfg);
-
-
-#ifdef CONFIG_MSM_MDP40
-				if (mdp_hw_revision < MDP4_REVISION_V2_1)
-					mdp_set_sync_cfg_1(mfd, vsync_cnt_cfg);
-#endif
-
-				/*
-				 * load the last line + 1 to be in the
-				 * safety zone
-				 */
-				vsync_load_cnt = mfd->panel_info.yres;
-
-				/* line counter init value at the next pulse */
-				MDP_OUTP(MDP_BASE + MDP_PRIM_VSYNC_INIT_VAL,
-							vsync_load_cnt);
-#ifdef CONFIG_MSM_MDP40
-				if (mdp_hw_revision < MDP4_REVISION_V2_1) {
-					MDP_OUTP(MDP_BASE +
-					MDP_SEC_VSYNC_INIT_VAL, vsync_load_cnt);
-				}
-#endif
-
-				/*
-				 * external vsync source pulse width and
-				 * polarity flip
-				 */
-				MDP_OUTP(MDP_BASE + MDP_PRIM_VSYNC_OUT_CTRL,
-							BIT(0));
-#ifdef CONFIG_MSM_MDP40
-				if (mdp_hw_revision < MDP4_REVISION_V2_1) {
-					MDP_OUTP(MDP_BASE +
-					MDP_SEC_VSYNC_OUT_CTRL, BIT(0));
-					MDP_OUTP(MDP_BASE +
-						MDP_VSYNC_SEL, 0x20);
-				}
-#endif
-
-				/* threshold */
-				MDP_OUTP(MDP_BASE + 0x200,
-					 (vsync_above_th << 16) |
-					 (vsync_start_th));
-
-				mdp_hw_vsync_clk_disable(mfd);
-				/* MDP cmd block disable */
-				mdp_pipe_ctrl(MDP_CMD_BLOCK,
-					      MDP_BLOCK_POWER_OFF, FALSE);
+				mdp_vsync_cfg_regs(mfd, TRUE);
 			}
 		}
 #else
@@ -428,7 +441,7 @@ void mdp_vsync_resync_workqueue_handler(struct work_struct *work)
 
 				pdata->set_vsync_notifier(
 						mdp_vsync_handler,
-							  (void *)mfd);
+						(void *)mfd);
 				vsync_fnc_enabled = TRUE;
 			}
 		}
