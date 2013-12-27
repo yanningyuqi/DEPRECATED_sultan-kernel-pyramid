@@ -20,6 +20,7 @@
 #define __ARCH_ARM_MACH_MSM_BOARD_PYRAMID_H
 
 #include <mach/board.h>
+#include <mach/msm_memtypes.h>
 
 #define PYRAMID_PROJECT_NAME	"pyramid"
 
@@ -174,6 +175,6 @@ int __init pyramid_init_keypad(void);
 int __init pyramid_wifi_init(void);
 void pyramid_init_fb(void);
 void pyramid_allocate_fb_region(void);
-void pyramid_mdp_writeback(void);
+void __init pyramid_mdp_writeback(struct memtype_reserve* reserve_table);
 void __init msm_fb_add_devices(void);
 #endif /* __ARCH_ARM_MACH_MSM_BOARD_PYRAMID_H */

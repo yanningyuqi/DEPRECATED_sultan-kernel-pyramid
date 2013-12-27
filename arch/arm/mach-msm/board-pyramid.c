@@ -1918,11 +1918,6 @@ static struct platform_device android_pmem_adsp_device = {
 	.dev = { .platform_data = &android_pmem_adsp_pdata },
 };
 
-static void __init reserve_mdp_memory(void)
-{
-pyramid_mdp_writeback();
-}
-
 static struct android_pmem_platform_data android_pmem_audio_pdata = {
 	.name = "pmem_audio",
 	.allocator_type = PMEM_ALLOCATORTYPE_BITMAP,
@@ -3515,6 +3510,11 @@ static void __init reserve_ion_memory(void)
 {
 }
 #endif
+
+static void __init reserve_mdp_memory(void)
+{
+	pyramid_mdp_writeback(msm8x60_reserve_table);
+}
 
 #ifdef CONFIG_ANDROID_PMEM
 static void __init reserve_memory_for(struct android_pmem_platform_data *p)

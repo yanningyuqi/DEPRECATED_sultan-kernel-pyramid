@@ -49,6 +49,12 @@
 #define MSM_FB_OVERLAY0_WRITEBACK_SIZE (0)
 #endif
 
+#ifdef CONFIG_FB_MSM_OVERLAY1_WRITEBACK
+#define MSM_FB_OVERLAY1_WRITEBACK_SIZE roundup((960 * ALIGN(540, 32) * 3 * 2), 4096)
+#else
+#define MSM_FB_OVERLAY1_WRITEBACK_SIZE (0)
+#endif
+
 #define PANEL_ID_PYD_SHARP	(0x21 | BL_MIPI | IF_MIPI | DEPTH_RGB888)
 #define PANEL_ID_PYD_AUO_NT	(0x22 | BL_MIPI | IF_MIPI | DEPTH_RGB888)
 
@@ -282,9 +288,10 @@ static struct msm_panel_common_pdata mdp_pdata = {
 	.mem_hid = BIT(ION_CP_MM_HEAP_ID),
 };
 
-void __init pyramid_mdp_writeback(void)
+void __init pyramid_mdp_writeback(struct memtype_reserve* reserve_table)
 {
 	mdp_pdata.ov0_wb_size = MSM_FB_OVERLAY0_WRITEBACK_SIZE;
+	mdp_pdata.ov1_wb_size = MSM_FB_OVERLAY1_WRITEBACK_SIZE;
 }
 
 static int first_init = 1;
