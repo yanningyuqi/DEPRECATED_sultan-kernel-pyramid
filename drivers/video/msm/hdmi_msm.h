@@ -14,7 +14,6 @@
 #define __HDMI_MSM_H__
 
 #include <mach/msm_iomap.h>
-#include <linux/switch.h>
 #include "external_common.h"
 /* #define PORT_DEBUG */
 
@@ -22,16 +21,16 @@
 const char *hdmi_msm_name(uint32 offset);
 void hdmi_outp(uint32 offset, uint32 value);
 uint32 hdmi_inp(uint32 offset);
-// 8x60 uses HDMI_BASE; 8960 uses MSM_HDMI_BASE
-#define HDMI_OUTP_ND(offset, value)	outpdw(HDMI_BASE+(offset), (value))
+
+#define HDMI_OUTP_ND(offset, value)	outpdw(MSM_HDMI_BASE+(offset), (value))
 #define HDMI_OUTP(offset, value)	hdmi_outp((offset), (value))
-#define HDMI_INP_ND(offset)		inpdw(HDMI_BASE+(offset))
+#define HDMI_INP_ND(offset)		inpdw(MSM_HDMI_BASE+(offset))
 #define HDMI_INP(offset)		hdmi_inp((offset))
 #else
-#define HDMI_OUTP_ND(offset, value)	outpdw(HDMI_BASE+(offset), (value))
-#define HDMI_OUTP(offset, value)	outpdw(HDMI_BASE+(offset), (value))
-#define HDMI_INP_ND(offset)		inpdw(HDMI_BASE+(offset))
-#define HDMI_INP(offset)		inpdw(HDMI_BASE+(offset))
+#define HDMI_OUTP_ND(offset, value)	outpdw(MSM_HDMI_BASE+(offset), (value))
+#define HDMI_OUTP(offset, value)	outpdw(MSM_HDMI_BASE+(offset), (value))
+#define HDMI_INP_ND(offset)		inpdw(MSM_HDMI_BASE+(offset))
+#define HDMI_INP(offset)		inpdw(MSM_HDMI_BASE+(offset))
 #endif
 
 
@@ -50,7 +49,6 @@ struct hdmi_msm_cec_msg {
 
 #define QFPROM_BASE		((uint32)hdmi_msm_state->qfprom_io)
 #define HDMI_BASE		((uint32)hdmi_msm_state->hdmi_io)
-#define SWITCH_DEV_SUPPORT
 
 struct hdmi_msm_state_type {
 	boolean panel_power_on;
@@ -101,9 +99,6 @@ struct hdmi_msm_state_type {
 	void __iomem *hdmi_io;
 
 	struct external_common_state_type common;
-#ifdef SWITCH_DEV_SUPPORT
-	struct switch_dev hpd_switch;
-#endif
 };
 
 extern struct hdmi_msm_state_type *hdmi_msm_state;

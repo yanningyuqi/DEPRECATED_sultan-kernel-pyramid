@@ -42,9 +42,6 @@ extern uint32 mdp_hw_revision;
 extern ulong mdp4_display_intf;
 extern spinlock_t mdp_spin_lock;
 extern int mdp_rev;
-#if 1 /* HTC_CSP_START */
-extern atomic_t need_soft_reset;
-#endif /* HTC_CSP_END */
 
 #define MDP4_REVISION_V1		0
 #define MDP4_REVISION_V2		1
@@ -221,12 +218,6 @@ struct mdp_dma_data {
 	struct semaphore mutex;
 	struct completion comp;
 	struct completion dmap_comp;
-};
-
-struct mdp_reg {
-	uint32_t reg;
-	uint32_t val;
-	uint32_t mask;
 };
 
 #define MDP_CMD_DEBUG_ACCESS_BASE   (MDP_BASE+0x10000)
@@ -724,7 +715,6 @@ unsigned long mdp_perf_level2clk_rate(uint32 perf_level);
 
 #ifdef CONFIG_MSM_BUS_SCALING
 int mdp_bus_scale_update_request(uint32_t index);
-int mdp_bus_scale_table_num(void);
 #endif
 
 #ifdef MDP_HW_VSYNC

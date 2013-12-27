@@ -523,10 +523,7 @@ void mdp_set_dma_pan_info(struct fb_info *info, struct mdp_dirty_region *dirty,
 
 	down(&mfd->sem);
 	iBuf = &mfd->ibuf;
-	if (mfd->map_buffer)
-		iBuf->buf = (uint8 *)mfd->map_buffer->iova[0];
-	else
-		iBuf->buf = (uint8 *) info->fix.smem_start;
+	iBuf->buf = (uint8 *) info->fix.smem_start;
 	iBuf->buf += info->var.xoffset * bpp +
 			info->var.yoffset * info->fix.line_length;
 

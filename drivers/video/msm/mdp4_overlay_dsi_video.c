@@ -27,7 +27,6 @@
 #include <asm/system.h>
 #include <asm/mach-types.h>
 #include <mach/hardware.h>
-#include <mach/debug_display.h>
 #include "mdp.h"
 #include "msm_fb.h"
 #include "mdp4.h"
@@ -96,7 +95,6 @@ int mdp4_dsi_video_on(struct platform_device *pdev)
 	int hsync_start_x;
 	int hsync_end_x;
 	uint8 *buf;
-	unsigned int buf_offset;
 	int bpp, ptype;
 	struct fb_info *fbi;
 	struct fb_var_screeninfo *var;
@@ -117,7 +115,7 @@ int mdp4_dsi_video_on(struct platform_device *pdev)
 
 	bpp = fbi->var.bits_per_pixel / 8;
 	buf = (uint8 *) fbi->fix.smem_start;
-	buf_offset = fbi->var.xoffset * bpp +
+	buf += fbi->var.xoffset * bpp +
 		fbi->var.yoffset * fbi->fix.line_length;
 
 	if (dsi_pipe == NULL) {
@@ -161,17 +159,9 @@ int mdp4_dsi_video_on(struct platform_device *pdev)
 	pipe->src_w = fbi->var.xres;
 	pipe->src_y = 0;
 	pipe->src_x = 0;
+	pipe->srcp0_addr = (uint32) buf;
 	pipe->srcp0_ystride = fbi->fix.line_length;
 	pipe->bpp = bpp;
-
-	if (mfd->map_buffer) {
-		pipe->srcp0_addr = (unsigned int)mfd->map_buffer->iova[0] + \
-			buf_offset;
-		pr_debug("start 0x%lx srcp0_addr 0x%x\n", mfd->
-			map_buffer->iova[0], pipe->srcp0_addr);
-	} else {
-		pipe->srcp0_addr = (uint32)(buf + buf_offset);
-	}
 
 	pipe->dst_h = fbi->var.yres;
 	pipe->dst_w = fbi->var.xres;
@@ -296,10 +286,8 @@ int mdp4_dsi_video_off(struct platform_device *pdev)
 	msleep(100);
 
 	/* dis-engage rgb0 from mixer0 */
-	if (dsi_pipe) {
+	if (dsi_pipe)
 		mdp4_mixer_stage_down(dsi_pipe);
-		mdp4_iommu_unmap(dsi_pipe);
-	}
 #endif
 
 	return ret;
@@ -311,7 +299,6 @@ void mdp4_dsi_video_3d_sbys(struct msm_fb_data_type *mfd,
 {
 	struct fb_info *fbi;
 	struct mdp4_overlay_pipe *pipe;
-	unsigned int buf_offset;
 	int bpp;
 	uint8 *buf = NULL;
 
@@ -333,7 +320,7 @@ void mdp4_dsi_video_3d_sbys(struct msm_fb_data_type *mfd,
 
 	bpp = fbi->var.bits_per_pixel / 8;
 	buf = (uint8 *) fbi->fix.smem_start;
-	buf_offset = fbi->var.xoffset * bpp +
+	buf += fbi->var.xoffset * bpp +
 		fbi->var.yoffset * fbi->fix.line_length;
 
 	if (pipe->is_3d) {
@@ -360,15 +347,7 @@ void mdp4_dsi_video_3d_sbys(struct msm_fb_data_type *mfd,
 	pipe->src_x = 0;
 	pipe->dst_y = 0;
 	pipe->dst_x = 0;
-
-	if (mfd->map_buffer) {
-		pipe->srcp0_addr = (unsigned int)mfd->map_buffer->iova[0] + \
-			buf_offset;
-		pr_debug("start 0x%lx srcp0_addr 0x%x\n", mfd->
-			map_buffer->iova[0], pipe->srcp0_addr);
-	} else {
-		pipe->srcp0_addr = (uint32)(buf + buf_offset);
-	}
+	pipe->srcp0_addr = (uint32)buf;
 
 	mdp4_overlay_rgb_setup(pipe);
 
@@ -446,8 +425,6 @@ static void mdp4_overlay_dsi_video_wait4event(struct msm_fb_data_type *mfd,
 {
 	unsigned long flag;
 	unsigned int data;
-	long timeout;
-	int retry_count = 0;
 
 	data = inpdw(MDP_BASE + DSI_VIDEO_BASE);
 	data &= 0x01;
@@ -457,42 +434,12 @@ static void mdp4_overlay_dsi_video_wait4event(struct msm_fb_data_type *mfd,
 	spin_lock_irqsave(&mdp_spin_lock, flag);
 	INIT_COMPLETION(dsi_video_comp);
 	mfd->dma->waiting = TRUE;
-	wmb();
 	outp32(MDP_INTR_CLEAR, intr_done);
 	mdp_intr_mask |= intr_done;
-	wmb();
 	outp32(MDP_INTR_ENABLE, mdp_intr_mask);
 	mdp_enable_irq(MDP_DMA2_TERM);  /* enable intr */
 	spin_unlock_irqrestore(&mdp_spin_lock, flag);
-	wmb();
-#if 1 /* HTC_CSP_START */
-	timeout = wait_for_completion_timeout(&dsi_video_comp, HZ/5);
-
-	while (!timeout && retry_count++ < 15) {
-		rmb();
-		if (mfd->dma->waiting == FALSE) {
-			pr_info("###%s(%d)timeout but dma not busy now\n", __func__, __LINE__);
-			break;
-		} else {
-			PR_DISP_INFO("%s(%d)timeout but dma still busy\n", __func__, __LINE__);
-			PR_DISP_INFO("MDP_DISPLAY_STATUS:%x\n", inpdw(msm_mdp_base + 0x18));
-			PR_DISP_INFO("MDP_INTR_STATUS:%x\n", inpdw(MDP_INTR_STATUS));
-			PR_DISP_INFO("MDP_INTR_ENABLE:%x\n", inpdw(MDP_INTR_ENABLE));
-			PR_DISP_INFO("MDP_OVERLAY_STATUS:%x\n", inpdw(msm_mdp_base + 0x10000));
-
-			timeout = wait_for_completion_timeout(&dsi_video_comp, HZ/5);
-		}
-	}
-
-	if (retry_count >= 15) {
-		PR_DISP_INFO("###mdp busy wait retry timed out, mfd->dma->waiting:%d\n", mfd->dma->waiting);
-		spin_lock_irqsave(&mdp_spin_lock, flag);
-		mfd->dma->waiting = FALSE;
-		spin_unlock_irqrestore(&mdp_spin_lock, flag);
-	}
-#else /* HTC_CSP_END */
 	wait_for_completion(&dsi_video_comp);
-#endif
 	mdp_disable_irq(MDP_DMA2_TERM);
 }
 
@@ -523,7 +470,7 @@ void mdp4_overlay_dsi_video_vsync_push(struct msm_fb_data_type *mfd,
 {
 	unsigned long flag;
 
-	if (pipe && (pipe->flags & MDP_OV_PLAY_NOWAIT))
+	if (pipe->flags & MDP_OV_PLAY_NOWAIT)
 		return;
 
 	if (dsi_pipe->blt_addr) {
@@ -638,7 +585,7 @@ static void mdp4_dsi_video_do_blt(struct msm_fb_data_type *mfd, int enable)
 		dsi_pipe->blt_addr = 0;
 		change++;
 	}
-	pr_debug("%s: enable=%d blt_addr=%x\n", __func__,
+	pr_info("%s: enable=%d blt_addr=%x\n", __func__,
 				enable, (int)dsi_pipe->blt_addr);
 	spin_unlock_irqrestore(&mdp_spin_lock, flag);
 
@@ -704,7 +651,6 @@ void mdp4_dsi_video_overlay(struct msm_fb_data_type *mfd)
 {
 	struct fb_info *fbi = mfd->fbi;
 	uint8 *buf;
-	unsigned int buf_offset;
 	int bpp;
 	struct mdp4_overlay_pipe *pipe;
 
@@ -714,26 +660,15 @@ void mdp4_dsi_video_overlay(struct msm_fb_data_type *mfd)
 	/* no need to power on cmd block since it's dsi video mode */
 	bpp = fbi->var.bits_per_pixel / 8;
 	buf = (uint8 *) fbi->fix.smem_start;
-	buf_offset = fbi->var.xoffset * bpp +
+	buf += fbi->var.xoffset * bpp +
 		fbi->var.yoffset * fbi->fix.line_length;
 
 	mutex_lock(&mfd->dma->ov_mutex);
 
 	pipe = dsi_pipe;
-
-	if (mfd->map_buffer) {
-		pipe->srcp0_addr = (unsigned int)mfd->map_buffer->iova[0] + \
-			buf_offset;
-		pr_debug("start 0x%lx srcp0_addr 0x%x\n", mfd->
-			map_buffer->iova[0], pipe->srcp0_addr);
-	} else {
-		pipe->srcp0_addr = (uint32)(buf + buf_offset);
-	}
-
+	pipe->srcp0_addr = (uint32) buf;
 	mdp4_overlay_rgb_setup(pipe);
 	mdp4_overlay_reg_flush(pipe, 1);
-	mdp4_overlay_update_layers(mfd, pipe->mixer_num);
 	mdp4_overlay_dsi_video_vsync_push(mfd, pipe);
-	mdp4_iommu_unmap(pipe);
 	mutex_unlock(&mfd->dma->ov_mutex);
 }

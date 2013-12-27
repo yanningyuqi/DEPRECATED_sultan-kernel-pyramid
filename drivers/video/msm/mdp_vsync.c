@@ -101,20 +101,9 @@ static void mdp_set_vsync(unsigned long data);
 void mdp_vsync_clk_enable(void)
 {
 	if (vsync_mfd) {
-#if 1 /* HTC_CSP_START */
-		unsigned int timeout = (vsync_clk_status == 0)? 18 : 0; /* wait 17 ms at most */
-#endif /* HTC_CSP_END */
 		mdp_hw_vsync_clk_enable(vsync_mfd);
 		if (!vsync_mfd->vsync_resync_timer.function)
 			mdp_set_vsync((unsigned long) vsync_mfd);
-#if 1 /* HTC_CSP_START */
-		if (timeout) {
-			uint32 count;
-			for (count = inpdw(MDP_BASE + 0x140) >> 16; timeout && count == inpdw(MDP_BASE + 0x140) >> 16; --timeout) {
-				hr_msleep(1);
-			}
-		}
-#endif /* HTC_CSP_END */
 	}
 }
 

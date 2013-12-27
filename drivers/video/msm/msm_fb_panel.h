@@ -149,19 +149,15 @@ struct msm_panel_info {
 	__u32 clk_rate;
 	__u32 clk_min;
 	__u32 clk_max;
-	__u32 pll_pref_div_ratio;
 	__u32 frame_count;
 	__u32 is_3d_panel;
 
-	__u32 width;
-	__u32 height;
 
 	struct mddi_panel_info mddi;
 	struct lcd_panel_info lcd;
 	struct lcdc_panel_info lcdc;
 
 	struct mipi_panel_info mipi;
-	struct gamma_curvy panel_char;
 };
 
 #define MSM_FB_SINGLE_MODE_PANEL(pinfo)		\
@@ -176,18 +172,12 @@ struct msm_fb_panel_data {
 	void (*set_rect) (int x, int y, int xres, int yres);
 	void (*set_vsync_notifier) (msm_fb_vsync_handler_type, void *arg);
 	void (*set_backlight) (struct msm_fb_data_type *);
-	void (*display_on) (struct msm_fb_data_type *);
-	void (*display_off) (struct msm_fb_data_type *);
+
+	/* function entry chain */
 	int (*on) (struct platform_device *pdev);
 	int (*off) (struct platform_device *pdev);
 	struct platform_device *next;
 	int (*clk_func) (int enable);
-#if defined CONFIG_FB_MSM_SELF_REFRESH
-	void (*self_refresh_switch) (int enable);
-#endif
-#if defined (CONFIG_MSM_AUTOBL_ENABLE)
-	int (*autobl_enable) (int on, struct msm_fb_data_type *);
-#endif
 };
 
 /*===========================================================================

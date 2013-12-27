@@ -131,7 +131,6 @@ extern char *mmss_sfpb_base;	/* mutimedia sub system sfpb */
 
 struct dsiphy_pll_divider_config {
 	u32 clk_rate;
-	u32 pref_div_ratio;
 	u32 fb_divider;
 	u32 ref_divider_ratio;
 	u32 bit_clk_divider;	/* oCLK1 */
@@ -199,10 +198,8 @@ struct dsi_buf {
 };
 
 /* dcs read/write */
-#define DTYPE_VSYNC_START	0x01	/* short write, 0 parameter */
 #define DTYPE_DCS_WRITE		0x05	/* short write, 0 parameter */
 #define DTYPE_DCS_WRITE1	0x15	/* short write, 1 parameter */
-#define DTYPE_HSYNC_START	0x21	/* short write, 0 parameter */
 #define DTYPE_DCS_READ		0x06	/* read */
 #define DTYPE_DCS_LWRITE	0x39	/* long write */
 
