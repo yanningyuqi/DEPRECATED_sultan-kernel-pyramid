@@ -400,6 +400,7 @@ struct msm_panel_common_pdata {
 	u32 ov0_wb_size;  /* overlay0 writeback size */
 	u32 ov1_wb_size;  /* overlay1 writeback size */
 	u32 mem_hid;
+	char cont_splash_enabled;
 };
 
 struct lcdc_platform_data {
@@ -452,14 +453,16 @@ struct mipi_dsi_panel_platform_data {
 	int fpga_3d_config_addr;
 	int *gpio;
 	struct mipi_dsi_phy_ctrl *phy_ctrl_settings;
+	void (*dsi_pwm_cfg)(void);
 };
 
-#define PANEL_NAME_MAX_LEN 30
-
+#define PANEL_NAME_MAX_LEN 50
 struct msm_fb_platform_data {
 	int (*detect_client)(const char *name);
 	int mddi_prescan;
 	int (*allow_set_offset)(void);
+	char prim_panel_name[PANEL_NAME_MAX_LEN];
+	char ext_panel_name[PANEL_NAME_MAX_LEN];
 };
 
 struct msm_hdmi_platform_data {
@@ -469,6 +472,8 @@ struct msm_hdmi_platform_data {
 	int (*enable_5v)(int on);
 	int (*core_power)(int on, int show);
 	int (*cec_power)(int on);
+	int (*panel_power)(int on);
+	int (*gpio_config)(int on);
 	int (*init_irq)(void);
 	bool (*check_hdcp_hw_support)(void);
 };

@@ -257,6 +257,11 @@ config FB_MSM_MIPI_TOSHIBA_VIDEO_WSVGA_PT
 	select FB_MSM_MIPI_DSI_TOSHIBA
 	default n
 
+config FB_MSM_MIPI_TOSHIBA_VIDEO_WUXGA
+	bool
+	select FB_MSM_MIPI_DSI_TOSHIBA
+	default n
+
 config FB_MSM_MIPI_NOVATEK_VIDEO_QHD_PT
 	bool
 	select FB_MSM_MIPI_DSI_NOVATEK
@@ -300,6 +305,13 @@ config FB_MSM_OVERLAY0_WRITEBACK
         bool "MDP overlay0 write back mode enable"
 	---help---
 	  Support for MDP4 OVERLAY0 write back mode
+
+
+config FB_MSM_OVERLAY1_WRITEBACK
+        depends on FB_MSM_OVERLAY
+        bool "MDP overlay1 write back mode enable"
+        ---help---
+          Support for MDP4 OVERLAY1 write back mode
 
 config FB_MSM_WRITEBACK_MSM_PANEL
 	depends on FB_MSM_OVERLAY
@@ -401,6 +413,7 @@ config FB_MSM_MIPI_PANEL_DETECT
 	bool "MIPI Panel Detect"
 	select FB_MSM_MIPI_TOSHIBA_VIDEO_WVGA_PT
 	select FB_MSM_MIPI_TOSHIBA_VIDEO_WSVGA_PT
+	select FB_MSM_MIPI_TOSHIBA_VIDEO_WUXGA
 	select FB_MSM_MIPI_RENESAS_VIDEO_FWVGA_PT
 	select FB_MSM_MIPI_RENESAS_CMD_FWVGA_PT
 	select FB_MSM_MIPI_TRULY_VIDEO_WVGA_PT
@@ -483,6 +496,10 @@ config FB_MSM_MIPI_TOSHIBA_VIDEO_WSVGA_PT_PANEL
 	bool "MIPI Toshiba WSVGA PT Panel"
 	select FB_MSM_MIPI_TOSHIBA_VIDEO_WSVGA_PT
 
+config FB_MSM_MIPI_TOSHIBA_VIDEO_WUXGA_PANEL
+	bool "MIPI Toshiba WUXGA (1920x1200) Panel"
+	select FB_MSM_MIPI_TOSHIBA_VIDEO_WUXGA
+
 config FB_MSM_MIPI_NOVATEK_VIDEO_QHD_PT_PANEL
 	bool "MIPI NOVATEK VIDEO QHD PT Panel"
 	select FB_MSM_MIPI_NOVATEK_VIDEO_QHD_PT
@@ -518,6 +535,7 @@ config FB_MSM_EBI2_TMD_QVGA_EPSON_QCIF
 	  Support for EBI2 TMD QVGA (240x320) and Epson QCIF (176x220) panel
 
 config FB_MSM_HDMI_AS_PRIMARY
+	depends on FB_MSM_HDMI_COMMON
 	bool "Use HDMI as primary panel"
 	---help---
 	Support for using HDMI as primary
