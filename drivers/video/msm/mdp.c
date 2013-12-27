@@ -151,33 +151,12 @@ static uint32 mdp_prim_panel_type = NO_PANEL;
 void mdp_color_enhancement(const struct mdp_reg *reg_seq, int size)
 {
 	int i;
-	/*uint32_t read_val;*/
 
-	/*printk(KERN_INFO" enter mdp_color_enhancement() (AL)\n");*/
 	printk(KERN_INFO "%s\n", __func__);
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 	for (i = 0; i < size; i++) {
-		/*read_val = 0;*/
 		if(reg_seq[i].mask == 0x0) {
-			/*printk(KERN_INFO "0x%X, 0x%X (AL), ",reg_seq[i].reg,
-			  reg_seq[i].val);*/
 			outpdw(MDP_BASE + reg_seq[i].reg, reg_seq[i].val);
-			/*
-			read_val = inpdw(MDP_BASE + reg_seq[i].reg);
-			if (read_val != reg_seq[i].val) {
-				printk(KERN_INFO "read after write
-						mis-match.(AL)\n");
-				wmb();
-				msleep(1);
-			}
-			printk(KERN_INFO "read 0x%X (AL)\n",read_val);
-			*/
-			/*
-			if( read_val != reg_seq[i].val) {
-				printk(KERN_INFO "re-write again.(AL)\n");
-				;//i = i -1;
-			}
-			*/
 		} else {
 			mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 			return ;

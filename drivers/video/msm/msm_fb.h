@@ -219,6 +219,7 @@ int msm_fb_writeback_stop(struct fb_info *info);
 int msm_fb_writeback_terminate(struct fb_info *info);
 int msm_fb_detect_client(const char *name);
 void msm_fb_display_on(struct msm_fb_data_type *mfd);
+void mdp_color_enhancement(const struct mdp_reg *reg_seq, int size);
 #define DEFAULT_BRIGHTNESS 83
 
 #ifdef CONFIG_FB_BACKLIGHT
