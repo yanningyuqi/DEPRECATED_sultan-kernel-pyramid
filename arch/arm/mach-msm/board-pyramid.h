@@ -38,7 +38,7 @@
 /*** Memory map ***/
 #define MSM_ION_HEAP_NUM      4
 
-#define MSM_FB_SIZE	      0x6F0000
+#define MSM_FB_SIZE roundup((960 * ALIGN(540, 32) * 4 * 3) + 0x3F4800, 4096)
 
 // PMEM SMI
 #define MSM_SMI_SIZE          0x4000000
