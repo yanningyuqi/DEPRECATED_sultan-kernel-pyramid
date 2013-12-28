@@ -609,13 +609,6 @@ static struct platform_device msm_fb_device = {
 	.dev.platform_data = &msm_fb_pdata,
 };
 
-int mdp_core_clk_rate_table[] = {
-	59080000,
-	128000000,
-	160000000,
-	200000000,
-};
-
 struct mdp_reg pyd_color_v11[] = {
 	{0x93400, 0x0222, 0x0},
 	{0x93404, 0xFFE4, 0x0},
@@ -1193,6 +1186,13 @@ static struct gamma_curvy gamma_tbl = {
 	.ref_y_lvl = {0, 138, 218, 298, 424, 601, 818, 1024},
 };
 #endif
+
+int mdp_core_clk_rate_table[] = {
+	266667000,
+	266667000,
+	266667000,
+	266667000,
+};
 
 static struct msm_panel_common_pdata mdp_pdata = {
 	.gpio = 28,
