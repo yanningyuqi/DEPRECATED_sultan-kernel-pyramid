@@ -51,7 +51,7 @@
 #define MSM_PMEM_ADSP_SIZE    0x1800000
 
 // ION SMI
-#define MSM_ION_MM_SIZE       0x2C00000
+#define MSM_ION_MM_SIZE       0x2D00000
 #define MSM_SMI_ION_SIZE      0x3000000
 
 // ION
