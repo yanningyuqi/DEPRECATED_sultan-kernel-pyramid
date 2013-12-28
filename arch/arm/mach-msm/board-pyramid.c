@@ -167,6 +167,8 @@ int set_three_phase_freq_badass(int cpufreq);
 #define PM8901_IRQ_BASE				(PM8058_IRQ_BASE + \
 						NR_PMIC8058_IRQS)
 
+int __init pyd_init_panel(struct resource *res, size_t size);
+
 enum {
 	GPIO_EXPANDER_IRQ_BASE  = PM8901_IRQ_BASE + NR_PMIC8901_IRQS,
 	GPIO_EXPANDER_GPIO_BASE = PM8901_GPIO_BASE + PM8901_MPPS,
@@ -1885,6 +1887,14 @@ static struct platform_device msm_batt_device = {
 };
 #endif
 
+static unsigned fb_size;
+static int __init fb_size_setup(char *p)
+{
+	fb_size = memparse(p, NULL);
+	return 0;
+}
+early_param("fb_size", fb_size_setup);
+
 #ifdef CONFIG_ANDROID_PMEM
 static unsigned pmem_adsp_size = MSM_PMEM_ADSP_SIZE;
 
@@ -1904,6 +1914,16 @@ static int __init pmem_audio_size_setup(char *p)
 }
 early_param("pmem_audio_size", pmem_audio_size_setup);
 #endif
+
+static struct resource msm_fb_resources[] = {
+	{
+		.flags  = IORESOURCE_DMA,
+	},
+	/* for overlay write back operation */
+	{
+		.flags  = IORESOURCE_DMA,
+	},
+};
 
 #ifdef CONFIG_ANDROID_PMEM
 static struct android_pmem_platform_data android_pmem_adsp_pdata = {
@@ -2115,7 +2135,23 @@ static struct platform_device android_pmem_smipool_device = {
 
 static void __init msm8x60_allocate_memory_regions(void)
 {
-	pyramid_allocate_fb_region();
+	void *addr;
+	unsigned long size;
+
+	size = MSM_FB_SIZE;
+	addr = alloc_bootmem_align(size, 0x1000);
+	msm_fb_resources[0].start = __pa(addr);
+	msm_fb_resources[0].end = msm_fb_resources[0].start + size - 1;
+	pr_info("allocating %lu bytes at %p (%lx physical) for fb\n",
+			size, addr, __pa(addr));
+
+#ifdef CONFIG_FB_MSM_OVERLAY_WRITEBACK
+	size = MSM_FB_WRITEBACK_SIZE;
+	msm_fb_resources[1].start = MSM_FB_WRITEBACK_BASE;
+	msm_fb_resources[1].end = msm_fb_resources[1].start + size - 1;
+	pr_info("allocating %lu bytes at 0x%p (0x%lx physical) for overlay\n",
+		size, __va(MSM_FB_WRITEBACK_BASE), (unsigned long) MSM_FB_WRITEBACK_BASE);
+#endif
 }
 
 static int pyramid_ts_cy8c_set_rst(int on)
@@ -2339,9 +2375,6 @@ static struct platform_device pyramid_rfkill = {
 	.id = -1,
 };
 #endif
-
-
-
 
 #if defined(CONFIG_MSM_RPM_LOG) || defined(CONFIG_MSM_RPM_LOG_MODULE)
 
@@ -3511,11 +3544,6 @@ static void __init reserve_ion_memory(void)
 }
 #endif
 
-static void __init reserve_mdp_memory(void)
-{
-	pyramid_mdp_writeback(msm8x60_reserve_table);
-}
-
 #ifdef CONFIG_ANDROID_PMEM
 static void __init reserve_memory_for(struct android_pmem_platform_data *p)
 {
@@ -3538,8 +3566,6 @@ static void __init reserve_pmem_memory(void)
 #endif
 }
 
-static void __init reserve_mdp_memory(void);
-
 static void __init msm8x60_calculate_reserve_sizes(void)
 {
 	size_pmem_devices();
@@ -3547,7 +3573,6 @@ static void __init msm8x60_calculate_reserve_sizes(void)
 #ifdef CONFIG_ION_MSM
 	reserve_ion_memory();
 #endif
-	reserve_mdp_memory();
 }
 
 static int msm8x60_paddr_to_memtype(phys_addr_t paddr)
@@ -6317,7 +6342,7 @@ static void __init msm8x60_init(struct msm_board_data *board_data)
 	platform_device_register(&msm_gsbi1_qup_spi_device);
 #endif
 
-	pyramid_init_fb();
+	pyd_init_panel(msm_fb_resources, ARRAY_SIZE(msm_fb_resources));
 	pyramid_ts_cy8c_set_system_rev(system_rev);
 	fixup_i2c_configs();
 	register_i2c_devices();
