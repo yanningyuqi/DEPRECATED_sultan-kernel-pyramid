@@ -78,7 +78,7 @@ static void pyramid_panel_power(int on)
 			}
 		}
 
-		ret = regulator_set_voltage(l1_3v, 3100000, 3100000);
+		ret = regulator_set_voltage(l1_3v, 2700000, 2700000);
 		if (ret) {
 			PR_DISP_ERR("%s: error setting l1_3v voltage\n", __func__);
 			goto fail;
