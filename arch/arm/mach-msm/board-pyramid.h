@@ -56,7 +56,7 @@
 
 // ION
 #define MSM_ION_WB_SIZE       0x2FD000
-#define MSM_ION_SF_SIZE       0x2900000
+#define MSM_ION_SF_SIZE       0x29A0000
 
 // Base addresses
 #define MSM_SMI_BASE          (0x38000000)
