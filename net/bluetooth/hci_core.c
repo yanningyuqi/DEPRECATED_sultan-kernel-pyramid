@@ -510,11 +510,6 @@ int hci_dev_open(__u16 dev)
 
 	hci_req_lock(hdev);
 
-	if (test_bit(HCI_UNREGISTER, &hdev->flags)) {
-		ret = -ENODEV;
-		goto done;
-	}
-
 	if (hdev->rfkill && rfkill_blocked(hdev->rfkill)) {
 		ret = -ERFKILL;
 		goto done;
@@ -1331,7 +1326,7 @@ int hci_blacklist_add(struct hci_dev *hdev, bdaddr_t *bdaddr)
 
 	entry = kzalloc(sizeof(struct bdaddr_list), GFP_KERNEL);
 	if (!entry) {
-		return -ENOMEM;
+		err = -ENOMEM;
 		goto err;
 	}
 
@@ -1568,8 +1563,6 @@ int hci_unregister_dev(struct hci_dev *hdev)
 
 	BT_DBG("%p name %s bus %d", hdev, hdev->name, hdev->bus);
 
-	set_bit(HCI_UNREGISTER, &hdev->flags);
-
 	write_lock_bh(&hci_dev_list_lock);
 	list_del(&hdev->list);
 	write_unlock_bh(&hci_dev_list_lock);
@@ -1578,8 +1571,6 @@ int hci_unregister_dev(struct hci_dev *hdev)
 
 	for (i = 0; i < NUM_REASSEMBLY; i++)
 		kfree_skb(hdev->reassembly[i]);
-
-	cancel_work_sync(&hdev->power_on);
 
 	if (!test_bit(HCI_INIT, &hdev->flags) &&
 					!test_bit(HCI_SETUP, &hdev->flags))
@@ -1779,7 +1770,7 @@ int hci_recv_fragment(struct hci_dev *hdev, int type, void *data, int count)
 
 		data += (count - rem);
 		count = rem;
-	};
+	}
 
 	return rem;
 }
@@ -1814,7 +1805,7 @@ int hci_recv_stream_fragment(struct hci_dev *hdev, void *data, int count)
 
 		data += (count - rem);
 		count = rem;
-	};
+	}
 
 	return rem;
 }
@@ -1912,6 +1903,9 @@ static int hci_send_frame(struct sk_buff *skb)
 
 	/* Get rid of skb owner, prior to sending to the driver. */
 	skb_orphan(skb);
+
+	/* Notify the registered devices about a new send */
+	hci_notify(hdev, HCI_DEV_WRITE);
 
 	return hdev->send(skb);
 }
