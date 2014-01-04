@@ -36,7 +36,7 @@
 #endif
 
 /*** Memory map ***/
-#define MSM_ION_HEAP_NUM      4
+#define MSM_ION_HEAP_NUM      5
 
 #define MSM_FB_SIZE roundup((960 * ALIGN(540, 32) * 4 * 3) + 0x3F4800, 4096)
 
@@ -52,11 +52,11 @@
 
 // ION SMI
 #define MSM_ION_MM_SIZE       0x3000000
-#define MSM_SMI_ION_SIZE      0x3200000
 
 // ION
 #define MSM_ION_WB_SIZE       0x2FD000
 #define MSM_ION_SF_SIZE       0x29A0000
+#define MSM_ION_MM_FW_SIZE    0x200000
 
 // Base addresses
 #define MSM_SMI_BASE          (0x38000000)
@@ -66,8 +66,8 @@
 #define MSM_ION_SF_BASE       (0x40400000)
 #define MSM_ION_WB_BASE       (0x45C00000)
 #define MSM_PMEM_AUDIO_BASE   (0x46400000)
-#define MSM_ION_MM_BASE       (0x6B600000)
-#define MSM_SMI_ION_BASE      (0x6B600000)
+#define MSM_ION_MM_FW_BASE    (0x6B600000)
+#define MSM_ION_MM_BASE       (0x6B800000)
 #define MSM_PMEM_ADSP_BASE    (0x6E800000)
 
 // Userspace allocation
