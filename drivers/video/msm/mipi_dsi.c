@@ -670,7 +670,7 @@ static void pyramid_panel_power(int on)
 			// Check if requested panel voltage is a multiple
 			// of 25mV.
 			if ((panel_voltage % 25000) != 0) {
-				PR_DISP_ERR("%s: %dmV undervolt is not a multiple of 50\n", __func__, panel_uv);
+				PR_DISP_ERR("%s: %dmV undervolt is not a multiple of 25\n", __func__, panel_uv);
 				PR_DISP_ERR("%s: falling back to 2.7v\n", __func__);
 				panel_voltage = 2700000;
 			}
