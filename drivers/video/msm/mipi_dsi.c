@@ -1,5 +1,7 @@
 /* Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
  *
+ * Copyright (c) 2013 Sultanxda <sultanxda@gmail.com>
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
  * only version 2 as published by the Free Software Foundation.
@@ -592,11 +594,18 @@ static struct regulator *l1_3v;
 static struct regulator *lvs1_1v8;
 static struct regulator *l4_1v8;
 
+int panel_uv = 400;
+module_param(panel_uv, int, 0664);
+
 static void pyramid_panel_power(int on)
 {
 	static int init;
 	int ret;
 	int rc;
+	int panel_voltage;
+	static int panel_voltage_after = 2700000;
+
+	panel_voltage = (3100000 - (panel_uv * 1000));
 
 	PR_DISP_INFO("%s(%d): init=%d system_rev:%d\n", __func__, on, init, system_rev);
 
@@ -646,6 +655,36 @@ static void pyramid_panel_power(int on)
 		}
 
 		init = 1;
+	}
+
+	if (init && (panel_voltage != 2700000)) {
+		// Do nothing if panel voltage has already been transformed
+		if (panel_voltage_after != panel_voltage) {
+			// Check if requested panel voltage is in bounds
+			if ((panel_voltage < 2400000) || (panel_voltage > 3100000)) {
+				PR_DISP_ERR("%s: %dmV is out of range\n", __func__, panel_uv);
+				PR_DISP_ERR("%s: falling back to 2.7v\n", __func__);
+				panel_voltage = 2700000;
+			}
+
+			// Check if requested panel voltage is a multiple
+			// of 25mV.
+			if ((panel_voltage % 25000) != 0) {
+				PR_DISP_ERR("%s: %dmV undervolt is not a multiple of 50\n", __func__, panel_uv);
+				PR_DISP_ERR("%s: falling back to 2.7v\n", __func__);
+				panel_voltage = 2700000;
+			}
+
+			ret = regulator_set_voltage(l1_3v, panel_voltage, panel_voltage);
+			if (ret) {
+				PR_DISP_ERR("%s: error undervolting panel\n", __func__);
+				goto fail;
+			} else {
+				PR_DISP_INFO("%s: panel voltage is now %dmV\n", __func__, (panel_voltage/1000));
+			}
+
+			panel_voltage_after = panel_voltage;
+		}
 	}
 
 	if (!l1_3v || IS_ERR(l1_3v)) {
