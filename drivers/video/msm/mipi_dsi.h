@@ -218,6 +218,7 @@ int mipi_dsi_controller_on(void);
 void mipi_dsi_sw_reset(void);
 int mipi_dsi_reset_read(void);
 void mipi_dsi_reset_set(int);
+void mipi_dsi_panel_uv(int panel_undervolt);
 
 extern struct mutex cmdlock;
 

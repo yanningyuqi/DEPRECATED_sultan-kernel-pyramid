@@ -1,6 +1,6 @@
 /* Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
  *
- * Copyright (c) 2013 Sultanxda <sultanxda@gmail.com>
+ * Copyright (c) 2014 Sultanxda <sultanxda@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -594,8 +594,13 @@ static struct regulator *l1_3v;
 static struct regulator *lvs1_1v8;
 static struct regulator *l4_1v8;
 
-int panel_uv = 250;
+static int panel_uv = 250;
 module_param(panel_uv, int, 0664);
+
+void mipi_dsi_panel_uv(int panel_undervolt)
+{
+	panel_uv = panel_undervolt;
+}
 
 static void pyramid_panel_power(int on)
 {
@@ -663,16 +668,16 @@ static void pyramid_panel_power(int on)
 			// Check if requested panel voltage is in bounds
 			if ((panel_voltage < 2400000) || (panel_voltage > 3100000)) {
 				PR_DISP_ERR("%s: %dmV is out of range\n", __func__, panel_uv);
-				PR_DISP_ERR("%s: falling back to 2.85v\n", __func__);
-				panel_voltage = 2850000;
+				PR_DISP_ERR("%s: falling back to %dmV\n", __func__, (panel_voltage_after/1000));
+				panel_voltage = panel_voltage_after;
 			}
 
 			// Check if requested panel voltage is a multiple
 			// of 25mV.
 			if ((panel_voltage % 25000) != 0) {
 				PR_DISP_ERR("%s: %dmV undervolt is not a multiple of 25\n", __func__, panel_uv);
-				PR_DISP_ERR("%s: falling back to 2.85v\n", __func__);
-				panel_voltage = 2850000;
+				PR_DISP_ERR("%s: falling back to %dmV\n", __func__, (panel_voltage_after/1000));
+				panel_voltage = panel_voltage_after;
 			}
 
 			ret = regulator_set_voltage(l1_3v, panel_voltage, panel_voltage);
@@ -684,6 +689,7 @@ static void pyramid_panel_power(int on)
 			}
 
 			panel_voltage_after = panel_voltage;
+			mipi_dsi_panel_uv((3100000 - panel_voltage_after)/1000);
 		}
 	}
 
