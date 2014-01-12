@@ -1545,6 +1545,7 @@ static int mdp4_overlay_validate_downscale(struct mdp_overlay *req,
 	unsigned long fill_rate_y_dir, fill_rate_x_dir;
 	unsigned long fillratex100, mdp_pixels_produced;
 	unsigned long mdp_clk_hz;
+	struct msm_panel_common_pdata *mdp_pdata;
 
 #ifdef OVDEBUG
 	PR_DISP_ERR("%s: Downscale validation with MDP Core"
@@ -1553,16 +1554,9 @@ static int mdp4_overlay_validate_downscale(struct mdp_overlay *req,
 		req->src_rect.w, req->src_rect.h, req->dst_rect.w,
 		req->dst_rect.h);
 #endif
-
 	panel_clk_khz = pclk_rate/1000;
-	mdp_clk_hz = mdp_perf_level2clk_rate(perf_level);
 
-	if (!mdp_clk_hz) {
-		PR_DISP_DEBUG("mdp_perf_level2clk_rate returned 0,"
-		"Downscale Validation incomplete\n");
-		return 0;
-	}
-
+	mdp_clk_hz = mdp_pdata->mdp_core_clk_rate;
 	mdp_clk_khz = mdp_clk_hz/1000;
 
 	num_hsync_pix_clks = mfd->panel_info.lcdc.h_back_porch +
