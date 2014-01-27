@@ -1,22 +1,5 @@
 #!/bin/sh
-MAKE="64"
 
-## Set compiler location
-echo Setting compiler location...
 export ARCH=arm
-export CROSS_COMPILE=/home/sultan/Downloads/arm-cortex_a8-linux-gnueabi-linaro_4.7.4-2013.12/bin/arm-cortex_a8-linux-gnueabi-
-
-## Build Sultan kernel
-rm -f /home/sultan/sultan-kernel-pyramid/arch/arm/boot/zImage
-make -j$MAKE ARCH=arm
-echo Copying and zipping zImage
-rm -f /home/sultan/sultan-kernel-pyramid/arch/arm/boot/zImage.zip
-cd /home/sultan/sultan-kernel-pyramid/arch/arm/boot
-zip zImage.zip zImage
-rm -f /home/sultan/Documents/Pyramid_AOSP/zImage.zip
-cp /home/sultan/sultan-kernel-pyramid/arch/arm/boot/zImage.zip /home/sultan/Documents/Pyramid_AOSP
-rm -f /home/sultan/sultan-kernel-pyramid/arch/arm/boot/zImage.zip
-cd /home/sultan/sultan-kernel-pyramid
-
-
-
+export CROSS_COMPILE=/home/sultan/Downloads/arm-cortex_a8-linux-gnueabi-linaro_4.7.4-2014.01/bin/arm-cortex_a8-linux-gnueabi-
+make -j64 ARCH=arm
