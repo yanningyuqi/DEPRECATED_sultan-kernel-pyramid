@@ -2,9 +2,7 @@
  *
  * Copyright (C) 2010-2011 HTC Corporation.
  *
- * Copyright (c) 2013 Sultanxda <sultanxda@gmail.com>
- * Copyright (c) 2013 Sebastian Sobczyk <sebastiansobczyk@wp.pl>
- * Copyright (c) 2013 bilalliberty <dominos_liberty @ xda-developers>
+ * Copyright (c) 2013-2014 Sultanxda <sultanxda@gmail.com>
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
