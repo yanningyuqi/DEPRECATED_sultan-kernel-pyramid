@@ -22,57 +22,38 @@
 #include <mach/board.h>
 #include <mach/msm_memtypes.h>
 
-#define PYRAMID_PROJECT_NAME	"pyramid"
-
 #define MSM_RAM_CONSOLE_BASE	MSM_HTC_RAM_CONSOLE_PHYS
 #define MSM_RAM_CONSOLE_SIZE	MSM_HTC_RAM_CONSOLE_SIZE
 
-#if defined(CONFIG_CRYPTO_DEV_QCRYPTO) || \
-		defined(CONFIG_CRYPTO_DEV_QCRYPTO_MODULE) || \
-		defined(CONFIG_CRYPTO_DEV_QCEDEV) || \
-		defined(CONFIG_CRYPTO_DEV_QCEDEV_MODULE)
-#define QCE_SIZE		0x10000
-#define QCE_0_BASE		0x18500000
-#endif
-
 /*** Memory map ***/
-#define MSM_ION_HEAP_NUM      5
+#define MSM_ION_HEAP_NUM      6
 
-#define MSM_FB_SIZE roundup((960 * ALIGN(540, 32) * 4 * 3) + 0x3F4800, 4096)
-
-// PMEM SMI
+#define MSM_FB_SIZE           roundup((960 * ALIGN(540, 32) * 4 * 3) + 0x3F4800, 4096)
 #define MSM_SMI_SIZE          0x4000000
-#define KERNEL_SMI_SIZE       0x600000
+#define KERNEL_SMI_SIZE       0xC00000
 #define USER_SMI_SIZE         (MSM_SMI_SIZE - KERNEL_SMI_SIZE)
-#define MSM_PMEM_SMIPOOL_SIZE USER_SMI_SIZE
-
-// PMEM
-#define MSM_PMEM_AUDIO_SIZE   0x28B000
-#define MSM_PMEM_ADSP_SIZE    0x1800000
-
-// ION SMI
-#define MSM_ION_MM_SIZE       0x2A00000
-
-// ION
+#define MSM_PMEM_ADSP_SIZE    0x1A00000
 #define MSM_ION_WB_SIZE       0x2FD000
-#define MSM_ION_SF_SIZE       0x29A0000
-#define MSM_ION_MM_FW_SIZE    0x300000
+#define MSM_PMEM_AUDIO_SIZE   0x28B000
+#define MSM_ION_SF_SIZE       0x2A00000
+#define MSM_ION_MM_FW_SIZE    0x200000
+#define MSM_ION_MM_SIZE       0x3100000
+#define MSM_ION_MFC_SIZE      0x100000
 
-// Base addresses
-#define MSM_SMI_BASE          (0x38000000)
-#define KERNEL_SMI_BASE       (MSM_SMI_BASE)
+#define MSM_SMI_BASE          0x38000000
+#define KERNEL_SMI_BASE       MSM_SMI_BASE
 #define USER_SMI_BASE         (KERNEL_SMI_BASE + KERNEL_SMI_SIZE)
-#define MSM_PMEM_SMIPOOL_BASE USER_SMI_BASE
-#define MSM_ION_SF_BASE       (0x40400000)
-#define MSM_ION_WB_BASE       (0x45C00000)
-#define MSM_PMEM_AUDIO_BASE   (0x46400000)
-#define MSM_ION_MM_FW_BASE    (0x6BB00000)
-#define MSM_ION_MM_BASE       (0x6BE00000)
-#define MSM_PMEM_ADSP_BASE    (0x6E800000)
+#define MSM_PMEM_ADSP_BASE    0x40400000
+#define MSM_FB_BASE           0x41E00000
+#define MSM_ION_WB_BASE       0x45C00000
+#define MSM_PMEM_AUDIO_BASE   0x46400000
+#define MSM_ION_SF_BASE       0x49800000
+#define MSM_ION_MM_FW_BASE    0x6CC00000
+#define MSM_ION_MM_BASE       0x6CE00000
+#define MSM_ION_MFC_BASE      0x6FF00000
 
-// Userspace allocation
-#define PHY_BASE_ADDR1  0x48000000
-#define SIZE_ADDR1      0x23B00000
+#define PHY_BASE_ADDR1        0x48000000
+#define SIZE_ADDR1            0x24C00000
 /*** END Memory map ***/
 
 /* GPIO definition */
