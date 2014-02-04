@@ -264,7 +264,6 @@ static struct lcdc_platform_data dtv_pdata = {
 };
 #endif
 
-#if 0
 struct mdp_table_entry pyd_color_v11[] = {
 	{0x93400, 0x0222, 0x0},
 	{0x93404, 0xFFE4, 0x0},
@@ -821,7 +820,6 @@ int pyramid_mdp_gamma(void)
 
 	return 0;
 }
-#endif
 
 static struct msm_panel_common_pdata mdp_pdata = {
 	.gpio = GPIO_LCD_TE,
@@ -836,7 +834,7 @@ static struct msm_panel_common_pdata mdp_pdata = {
 	.mem_hid = BIT(ION_CP_WB_HEAP_ID),
 	.cont_splash_enabled = 0x00,
 	.mdp_iommu_split_domain = 0,
-	//.mdp_gamma = pyramid_mdp_gamma,
+	.mdp_gamma = pyramid_mdp_gamma,
 };
 
 void __init pyramid_mdp_writeback(struct memtype_reserve* reserve_table)
