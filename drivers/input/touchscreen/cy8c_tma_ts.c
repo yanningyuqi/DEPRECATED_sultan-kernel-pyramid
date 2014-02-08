@@ -1223,7 +1223,8 @@ static int cy8c_ts_probe(struct i2c_client *client,
 	}
 	ts->input_dev->name = "cy8c-touchscreen";
 	ts->input_dev->id.version = ts->version;
-	ts->input_dev->mtsize = 4;/* Initialize buffer with maximum 4 fingers at the same time */
+	ts->input_dev->mtsize = 10; /* Initialize buffer with maximum 10 fingers at the same time */
+				    /* NOTE: Our touchscreen firmware only supports up to 4 fingers */
 
 	set_bit(EV_SYN, ts->input_dev->evbit);
 	set_bit(EV_ABS, ts->input_dev->evbit);
