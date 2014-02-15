@@ -645,7 +645,6 @@ static struct msm_ce_hw_support qcrypto_ce_hw_suppport = {
 	.shared_ce_resource = QCE_SHARE_CE_RESOURCE,
 	.hw_key_support = QCE_HW_KEY_SUPPORT,
 	.sha_hmac = QCE_SHA_HMAC_SUPPORT,
-	.bus_scale_table = NULL,
 };
 
 static struct platform_device qcrypto_device = {
@@ -668,7 +667,6 @@ static struct msm_ce_hw_support qcedev_ce_hw_suppport = {
 	.shared_ce_resource = QCE_SHARE_CE_RESOURCE,
 	.hw_key_support = QCE_HW_KEY_SUPPORT,
 	.sha_hmac = QCE_SHA_HMAC_SUPPORT,
-	.bus_scale_table = NULL,
 };
 
 static struct platform_device qcedev_device = {
@@ -2863,13 +2861,6 @@ static struct tsens_platform_data pyr_tsens_pdata  = {
 		.slope 			= 702,
 };
 
-/*
-static struct platform_device msm_tsens_device = {
-	.name   = "tsens-tm",
-	.id = -1,
-};
-*/
-
 #ifdef CONFIG_SENSORS_MSM_ADC
 static struct adc_access_fn xoadc_fn = {
 	pm8058_xoadc_select_chan_and_start_conv,
@@ -3492,8 +3483,6 @@ static struct platform_device *pyramid_devices[] __initdata = {
 #ifdef CONFIG_HW_RANDOM_MSM
 	&msm_device_rng,
 #endif
-
-	//&msm_tsens_device,
 	&msm_rpm_device,
 	&cable_detect_device,
 #ifdef CONFIG_BT
