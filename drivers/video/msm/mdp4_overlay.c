@@ -1545,7 +1545,7 @@ static int mdp4_overlay_validate_downscale(struct mdp_overlay *req,
 	unsigned long fill_rate_y_dir, fill_rate_x_dir;
 	unsigned long fillratex100, mdp_pixels_produced;
 	unsigned long mdp_clk_hz;
-	struct msm_panel_common_pdata *mdp_pdata;
+	struct msm_panel_common_pdata *mdp_pdata = NULL;
 
 #ifdef OVDEBUG
 	PR_DISP_ERR("%s: Downscale validation with MDP Core"
