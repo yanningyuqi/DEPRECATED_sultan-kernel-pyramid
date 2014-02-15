@@ -154,9 +154,9 @@ static void check_temp(struct work_struct *work)
 				} else if ((pre_throt_max0 != 0) && (pre_throt_max1 == 0)) {
 				max_freq = pre_throt_max0;
 				} else if ((pre_throt_max0 == 0) && (pre_throt_max1 == 0)) {
-				max_freq = 1404000;
+				max_freq = 1512000;
 				pr_err("msm_thermal: FATAL ERROR! pre_throt_max0=0 and pre_throt_max1=0!\n");
-				pr_err("msm_thermal: Falling back to 1404MHz to avoid a meltdown!\n");
+				pr_err("msm_thermal: Falling back to 1512MHz to avoid a meltdown!\n");
 				}
 				/* wait until 2nd core is unthrottled */
 				if (cpu == 1)
