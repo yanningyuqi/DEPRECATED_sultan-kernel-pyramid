@@ -2690,7 +2690,6 @@ static struct clk_freq_tbl clk_tbl_rot[] = {
 	F_ROT(114290000, pll2,  7),
 	F_ROT(133330000, pll2,  6),
 	F_ROT(160000000, pll2,  5),
-	F_ROT(200000000, pll2,  4),
 	F_END
 };
 
@@ -2722,7 +2721,7 @@ static struct rcg_clk rot_clk = {
 	.c = {
 		.dbg_name = "rot_clk",
 		.ops = &clk_ops_rcg_8x60,
-		VDD_DIG_FMAX_MAP2(LOW, 80000000, NOMINAL, 200000000),
+		VDD_DIG_FMAX_MAP2(LOW, 80000000, NOMINAL, 160000000),
 		CLK_INIT(rot_clk.c),
 		.depends = &rot_axi_clk.c,
 	},

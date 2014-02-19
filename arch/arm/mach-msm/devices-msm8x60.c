@@ -1837,7 +1837,7 @@ static struct msm_rot_clocks rotator_clocks[] = {
 	{
 		.clk_name = "core_clk",
 		.clk_type = ROTATOR_CORE_CLK,
-		.clk_rate = 200 * 1000 * 1000,
+		.clk_rate = 160 * 1000 * 1000,
 	},
 	{
 		.clk_name = "iface_clk",
